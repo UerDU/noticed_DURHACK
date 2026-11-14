@@ -3,3 +3,4 @@ uvicorn
 python-multipart
 pillow
 numpy
+anthropic   # optional: only used if ANTHROPIC_API_KEY is set

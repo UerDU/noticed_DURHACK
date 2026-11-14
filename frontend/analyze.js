@@ -112,7 +112,7 @@ const SACCADE_LOCAL = (() => {
       }
     }
     const path = peaks.slice(0, STOPS);
-    const msgLabel = (objective || "your message").toLowerCase().slice(0, 24);
+    const msgLabel = (objective || "your message").trim().replace(/^(the|our|my|your|a|an)\s+/i, "").toLowerCase().slice(0, 24);
     const eye_path = path.map((p, i) => ({ label: i === targetRank ? msgLabel : where(p.x, p.y), x: +p.x.toFixed(1), y: +p.y.toFixed(1) }));
     // make labels unique
     const seen = {}; eye_path.forEach(p => { if (seen[p.label]) p.label += " " + (++seen[p.label]); else seen[p.label] = 1; });
