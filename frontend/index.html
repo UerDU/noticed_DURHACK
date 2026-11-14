@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Noticed — Composition Critic</title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #181b22; --line: #2a2f3a; --text: #eef0f4; --muted: #9aa3b2;
+    --accent: #ffcc33; --green: #3ecf8e; --yellow: #ffcc33; --orange: #ff9a3c; --red: #ff5c5c;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background: var(--bg); color: var(--text); }
+  header { padding: 20px 24px; border-bottom: 1px solid var(--line); display: flex; align-items: baseline; gap: 12px; }
+  header h1 { margin: 0; font-size: 22px; letter-spacing: -0.5px; }
+  header span { color: var(--muted); font-size: 14px; }
+  main { max-width: 1100px; margin: 0 auto; padding: 24px; display: grid; grid-template-columns: 1.2fr 1fr; gap: 24px; }
+  @media (max-width: 800px) { main { grid-template-columns: 1fr; padding: 16px; } }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; }
+  label { display: block; font-size: 13px; color: var(--muted); margin: 0 0 6px; }
+
+  /* Upload */
+  #drop { border: 2px dashed var(--line); border-radius: 12px; padding: 28px; text-align: center; cursor: pointer; color: var(--muted); transition: border-color .2s; }
+  #drop.over, #drop:hover { border-color: var(--accent); color: var(--text); }
+  #objective { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--line); background: #11141a; color: var(--text); font-size: 15px; margin-top: 14px; }
+  button { margin-top: 14px; width: 100%; padding: 13px; border: 0; border-radius: 10px; background: var(--accent); color: #111; font-weight: 700; font-size: 15px; cursor: pointer; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  button.ghost { background: transparent; color: var(--text); border: 1px solid var(--line); font-weight: 500; }
+
+  /* Image + overlay */
+  #stage { position: relative; margin-top: 16px; display: none; border-radius: 10px; overflow: hidden; }
+  #stage img { display: block; width: 100%; height: auto; }
+  #stage .dim { position: absolute; inset: 0; background: rgba(0,0,0,.25); }
+  #stage svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  .box { position: absolute; border: 2px dashed rgba(255,255,255,.55); border-radius: 6px; }
+  .box.target { border: 2px solid var(--accent); box-shadow: 0 0 0 9999px rgba(0,0,0,0); }
+  .box span { position: absolute; top: -22px; left: -2px; font-size: 11px; padding: 2px 6px; border-radius: 4px; background: rgba(0,0,0,.7); white-space: nowrap; }
+  .box.target span { background: var(--accent); color: #111; font-weight: 700; }
+  .marker { position: absolute; width: 30px; height: 30px; margin: -15px 0 0 -15px; border-radius: 50%; background: #fff; color: #111; font-weight: 800; font-size: 14px; display: grid; place-items: center; opacity: 0; transform: scale(.4); transition: opacity .25s, transform .25s; box-shadow: 0 2px 10px rgba(0,0,0,.5); }
+  .marker.show { opacity: 1; transform: scale(1); }
+  .marker.target { background: var(--accent); }
+  #gaze { position: absolute; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%; background: radial-gradient(circle, rgba(255,204,51,1) 0%, rgba(255,204,51,.5) 45%, rgba(255,204,51,0) 75%); box-shadow: 0 0 25px 10px rgba(255,204,51,.45); transition: left .7s ease-in-out, top .7s ease-in-out, opacity .3s; opacity: 0; }
+
+  /* Results */
+  #results { display: none; }
+  .score-wrap { display: flex; align-items: center; gap: 18px; }
+  .ring { --pct: 0; --col: var(--accent); width: 110px; height: 110px; border-radius: 50%; display: grid; place-items: center; background: conic-gradient(var(--col) calc(var(--pct) * 1%), var(--line) 0); flex-shrink: 0; }
+  .ring div { width: 86px; height: 86px; border-radius: 50%; background: var(--panel); display: grid; place-items: center; font-size: 32px; font-weight: 800; }
+  .band { font-size: 20px; font-weight: 700; }
+  .band-sub { color: var(--muted); font-size: 14px; margin-top: 4px; }
+  h3 { margin: 22px 0 10px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); }
+  .bar { margin-bottom: 10px; }
+  .bar-top { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 4px; }
+  .bar-top b { font-variant-numeric: tabular-nums; }
+  .track { height: 8px; background: var(--line); border-radius: 99px; overflow: hidden; }
+  .fill { height: 100%; width: 0; border-radius: 99px; transition: width .8s ease; }
+  ol, ul { margin: 0; padding-left: 20px; }
+  li { margin-bottom: 8px; line-height: 1.4; }
+  .placeholder { color: var(--muted); text-align: center; padding: 40px 10px; }
+  .spinner { width: 28px; height: 28px; border: 3px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 12px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<header>
+  <h1>👁️ Noticed</h1>
+  <span>You tell us what you want to communicate. We help make sure your audience understands it.</span>
+</header>
+
+<main>
+  <!-- LEFT: input + image -->
+  <section class="panel">
+    <div id="drop">📤 <b>Upload a poster or post</b><br><small>Click or drag an image here</small></div>
+    <input type="file" id="file" accept="image/*" hidden />
+
+    <label for="objective" style="margin-top:14px">What should people notice first?</label>
+    <input id="objective" placeholder="e.g. 50% discount, event date, new product" />
+
+    <button id="analyse" disabled>Analyse composition</button>
+
+    <div id="stage">
+      <img id="img" alt="Uploaded design" />
+      <div class="dim"></div>
+      <div id="boxes"></div>
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none">
+        <polyline id="pathline" fill="none" stroke="rgba(255,204,51,.8)" stroke-width="2" stroke-dasharray="4 3" vector-effect="non-scaling-stroke" points="" />
+      </svg>
+      <div id="markers"></div>
+      <div id="gaze"></div>
+    </div>
+    <button id="replay" class="ghost" style="display:none">▶ Replay eye path</button>
+  </section>
+
+  <!-- RIGHT: results -->
+  <section class="panel">
+    <div id="empty" class="placeholder">Upload a design and tell us what matters. We'll show where eyes actually go.</div>
+    <div id="loading" class="placeholder" style="display:none"><div class="spinner"></div>Reading your design…</div>
+    <div id="results">
+      <div class="score-wrap">
+        <div class="ring" id="ring"><div id="total">0</div></div>
+        <div>
+          <div class="band" id="band">–</div>
+          <div class="band-sub" id="bandSub"></div>
+        </div>
+      </div>
+      <h3>Score breakdown</h3>
+      <div id="bars"></div>
+      <h3>What's wrong</h3>
+      <ol id="problems"></ol>
+      <h3>How to fix it</h3>
+      <ol id="fixes"></ol>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ========= CONFIG: change these at integration ========= */
+const USE_FAKE = true;                          // set false once C's API is ready
+const API_URL  = "http://localhost:8000/analyse"; // C's endpoint
+
+// Max points per sub-score (must add up to 100, agree with A/B/C)
+const MAX = { focal_match: 25, focal_point: 15, legibility: 15, contrast: 15, clutter: 15, balance: 15 };
+const NAMES = {
+  focal_match: "Eye reaches your message", focal_point: "Clear focal point", legibility: "Readable on a phone",
+  contrast: "Contrast", clutter: "Breathing space", balance: "Balance & alignment"
+};
+const BANDS = [
+  { min: 85, label: "🟢 Ready to launch", sub: "People will notice and get the message", col: "var(--green)" },
+  { min: 65, label: "🟡 Almost there",    sub: "1–2 quick fixes needed",                 col: "var(--yellow)" },
+  { min: 40, label: "🟠 Needs work",      sub: "Your key message is getting lost",       col: "var(--orange)" },
+  { min: 0,  label: "🔴 Will be ignored", sub: "Major composition problems",             col: "var(--red)" }
+];
+
+/* ========= FAKE DATA (same format C will return) ========= */
+function fakeResult(objective) {
+  return {
+    objective: objective || "50% discount",
+    elements: [
+      { label: "logo",     box: [8, 5, 45, 18] },
+      { label: "photo",    box: [10, 28, 80, 40] },
+      { label: "headline", box: [12, 70, 76, 10] },
+      { label: "discount", box: [60, 84, 32, 10] }
+    ],
+    eye_path: [
+      { label: "logo", x: 30, y: 14 }, { label: "photo", x: 50, y: 48 },
+      { label: "headline", x: 50, y: 75 }, { label: "discount", x: 76, y: 89 }
+    ],
+    subscores: { focal_match: 5, focal_point: 8, legibility: 8, contrast: 10, clutter: 5, balance: 9 },
+    problems: [
+      "Your discount is the LAST thing people see. It's 4th in the eye path.",
+      "The logo is bigger and brighter than the offer, so it steals attention.",
+      "The discount text is too small to read when scrolling on a phone."
+    ],
+    fixes: [
+      "Make '50% OFF' the biggest element and move it to the top half.",
+      "Shrink the logo and move it to a corner.",
+      "Put the discount on a high-contrast block colour."
+    ]
+  };
+}
+
+/* ========= Elements ========= */
+const $ = id => document.getElementById(id);
+let imageFile = null, lastResult = null, playing = false;
+
+/* ========= Upload ========= */
+$("drop").onclick = () => $("file").click();
+$("file").onchange = e => loadFile(e.target.files[0]);
+["dragover", "dragenter"].forEach(ev => $("drop").addEventListener(ev, e => { e.preventDefault(); $("drop").classList.add("over"); }));
+["dragleave", "drop"].forEach(ev => $("drop").addEventListener(ev, e => { e.preventDefault(); $("drop").classList.remove("over"); }));
+$("drop").addEventListener("drop", e => loadFile(e.dataTransfer.files[0]));
+$("objective").oninput = updateButton;
+
+function loadFile(file) {
+  if (!file || !file.type.startsWith("image/")) return alert("Please upload an image.");
+  imageFile = file;
+  $("img").src = URL.createObjectURL(file);
+  $("stage").style.display = "block";
+  $("drop").innerHTML = `✅ <b>${file.name}</b><br><small>Click to change</small>`;
+  clearOverlay();
+  updateButton();
+}
+function updateButton() { $("analyse").disabled = !imageFile || !$("objective").value.trim(); }
+
+/* ========= Analyse ========= */
+$("analyse").onclick = async () => {
+  const objective = $("objective").value.trim();
+  $("empty").style.display = "none"; $("results").style.display = "none"; $("loading").style.display = "block";
+  $("analyse").disabled = true; clearOverlay();
+  try {
+    let result;
+    if (USE_FAKE) {
+      await wait(1200);                         // pretend to think
+      result = fakeResult(objective);
+    } else {
+      const form = new FormData();
+      form.append("image", imageFile);
+      form.append("objective", objective);
+      const res = await fetch(API_URL, { method: "POST", body: form });
+      if (!res.ok) throw new Error("API error " + res.status);
+      result = await res.json();
+    }
+    lastResult = result;
+    $("loading").style.display = "none";
+    showResults(result);
+    drawBoxes(result);
+    await playEyePath(result);
+  } catch (err) {
+    console.error(err);
+    $("loading").style.display = "none"; $("empty").style.display = "block";
+    $("empty").textContent = "Something went wrong analysing that image. Try again.";
+  } finally { updateButton(); }
+};
+$("replay").onclick = () => lastResult && playEyePath(lastResult);
+
+/* ========= Overlay ========= */
+function clearOverlay() {
+  $("boxes").innerHTML = ""; $("markers").innerHTML = "";
+  $("pathline").setAttribute("points", ""); $("gaze").style.opacity = 0; $("replay").style.display = "none";
+}
+function isTarget(label, objective) {
+  const a = label.toLowerCase(), b = objective.toLowerCase();
+  return b.includes(a) || a.includes(b);
+}
+function drawBoxes(r) {
+  $("boxes").innerHTML = "";
+  r.elements.forEach(el => {
+    const [x, y, w, h] = el.box;
+    const d = document.createElement("div");
+    d.className = "box" + (isTarget(el.label, r.objective) ? " target" : "");
+    Object.assign(d.style, { left: x + "%", top: y + "%", width: w + "%", height: h + "%" });
+    d.innerHTML = `<span>${isTarget(el.label, r.objective) ? "🎯 " : ""}${el.label}</span>`;
+    $("boxes").appendChild(d);
+  });
+}
+async function playEyePath(r) {
+  if (playing) return; playing = true;
+  $("markers").innerHTML = ""; $("pathline").setAttribute("points", ""); $("replay").style.display = "none";
+  const g = $("gaze"); const pts = [];
+  g.style.transition = "none"; g.style.left = r.eye_path[0].x + "%"; g.style.top = r.eye_path[0].y + "%";
+  await wait(50); g.style.transition = ""; g.style.opacity = 1;
+
+  for (let i = 0; i < r.eye_path.length; i++) {
+    const p = r.eye_path[i];
+    g.style.left = p.x + "%"; g.style.top = p.y + "%";
+    await wait(i === 0 ? 300 : 750);
+    pts.push(`${p.x},${p.y}`); $("pathline").setAttribute("points", pts.join(" "));
+    const m = document.createElement("div");
+    m.className = "marker" + (isTarget(p.label || "", r.objective) ? " target" : "");
+    m.style.left = p.x + "%"; m.style.top = p.y + "%"; m.textContent = i + 1;
+    $("markers").appendChild(m); requestAnimationFrame(() => m.classList.add("show"));
+    await wait(450);
+  }
+  await wait(300); g.style.opacity = 0;
+  $("replay").style.display = "block"; playing = false;
+}
+
+/* ========= Score panel ========= */
+function showResults(r) {
+  const total = r.total ?? Object.values(r.subscores).reduce((a, b) => a + b, 0);
+  const band = BANDS.find(b => total >= b.min);
+  $("results").style.display = "block";
+  $("band").textContent = r.band ? `${band.label.split(" ")[0]} ${r.band}` : band.label;
+  $("bandSub").textContent = band.sub;
+  $("ring").style.setProperty("--col", band.col);
+  countUp(total, band);
+
+  $("bars").innerHTML = "";
+  Object.entries(r.subscores).forEach(([key, val]) => {
+    const max = MAX[key] || 10, pct = Math.round(val / max * 100);
+    const col = pct >= 75 ? "var(--green)" : pct >= 50 ? "var(--yellow)" : pct >= 30 ? "var(--orange)" : "var(--red)";
+    const div = document.createElement("div"); div.className = "bar";
+    div.innerHTML = `<div class="bar-top"><span>${NAMES[key] || key}</span><b>${val}/${max}</b></div>
+                     <div class="track"><div class="fill" style="background:${col}"></div></div>`;
+    $("bars").appendChild(div);
+    requestAnimationFrame(() => setTimeout(() => div.querySelector(".fill").style.width = pct + "%", 50));
+  });
+  $("problems").innerHTML = r.problems.map(p => `<li>${p}</li>`).join("");
+  $("fixes").innerHTML = r.fixes.map(f => `<li>${f}</li>`).join("");
+}
+function countUp(target) {
+  let n = 0; const step = Math.max(1, Math.round(target / 30));
+  const t = setInterval(() => {
+    n = Math.min(target, n + step);
+    $("total").textContent = n; $("ring").style.setProperty("--pct", n);
+    if (n >= target) clearInterval(t);
+  }, 30);
+}
+const wait = ms => new Promise(r => setTimeout(r, ms));
+</script>
+</body>
