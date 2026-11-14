@@ -72,6 +72,7 @@ const wait = (ms) => new Promise(r => setTimeout(r, ms));
 const esc = (s) => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const matches = (a, b) => { a = (a || "").toLowerCase(); b = (b || "").toLowerCase(); return !!a && !!b && (a.includes(b) || b.includes(a)); };
 let imageFile = null, imageURL = null, lastResult = null, gazeTimer = null;
+let isExample = false, targetPt = null, showingFixed = false, originalURL = null;
 
 /* ---------- 2 · upload ---------- */
 const dz = $("dropzone");
@@ -83,16 +84,24 @@ $("cameraInput").onchange = (e) => setFile(e.target.files[0]);
 ["dragleave", "drop"].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.remove("over"); }));
 dz.addEventListener("drop", e => setFile(e.dataTransfer.files[0]));
 
-function setFile(file) {
+function setFile(file, example = false) {
   if (!file || !file.type.startsWith("image/")) { alert("Please choose an image (PNG or JPG)."); return; }
-  imageFile = file;
+  imageFile = file; isExample = example; targetPt = null; showingFixed = false;
   if (imageURL) URL.revokeObjectURL(imageURL);
-  imageURL = URL.createObjectURL(file);
-  $("dropPreview").src = imageURL; $("dropPreview").hidden = false;
+  imageURL = URL.createObjectURL(file); originalURL = imageURL;
+  $("dropPreview").src = imageURL;
+  $("tapWrap").hidden = false; $("tapHint").hidden = example; $("tapStar").hidden = true;
   $("dropIcon").hidden = true;
   $("dropTitle").textContent = file.name || "Your poster";
   updateButton();
 }
+// tap where your message is (gives the score an exact target)
+$("dropPreview").addEventListener("click", (e) => {
+  const r = e.target.getBoundingClientRect();
+  targetPt = { x: (e.clientX - r.left) / r.width * 100, y: (e.clientY - r.top) / r.height * 100 };
+  const s = $("tapStar"); s.hidden = false; s.style.left = targetPt.x + "%"; s.style.top = targetPt.y + "%";
+  $("tapHint").textContent = "★ Got it. That's your message. Tap again to move it.";
+});
 document.querySelectorAll(".chip").forEach(chip => chip.onclick = () => {
   document.querySelectorAll(".chip").forEach(c => c.classList.remove("on"));
   chip.classList.add("on");
@@ -105,7 +114,7 @@ function updateButton() { $("checkBtn").disabled = !(imageFile && $("goal").valu
 // "See an example" / "Try our example": loads the sample poster
 document.querySelectorAll(".js-example").forEach(b => b.onclick = async () => {
   const blob = await (await fetch("sample-poster.png")).blob();
-  setFile(new File([blob], "bloom-cafe-sample.png", { type: "image/png" }));
+  setFile(new File([blob], "bloom-cafe-sample.png", { type: "image/png" }), true);
   $("goal").value = "50% off";
   updateButton();
   analyse();
@@ -113,30 +122,97 @@ document.querySelectorAll(".js-example").forEach(b => b.onclick = async () => {
 
 /* ---------- analyse ---------- */
 $("checkBtn").onclick = analyse;
+const STEPS_TEXT = ["Reading your poster…", "Predicting where eyes go…", "Scoring the composition…", "Writing your fixes…"];
+const BACKEND_TIMEOUT_MS = 25000;   // after this, use the quick in-browser check so the demo never dies
+
 async function analyse() {
   const objective = $("goal").value.trim();
   $("resultsBox").classList.remove("show");
   $("loading").classList.add("show");
+  let s = 0; $("loadingText").textContent = STEPS_TEXT[0];
+  const ticker = setInterval(() => { s = Math.min(s + 1, STEPS_TEXT.length - 1); $("loadingText").textContent = STEPS_TEXT[s]; }, 1600);
   $("results").scrollIntoView({ behavior: "smooth" });
   try {
     let r;
-    if (USE_FAKE) { await wait(1300); r = fakeResult(objective); }
-    else {
-      const form = new FormData();
-      form.append("image", imageFile);
-      form.append("objective", objective);
-      const res = await fetch(API_URL, { method: "POST", body: form });
-      if (!res.ok) throw new Error("API error " + res.status);
-      r = await res.json();
+    if (USE_FAKE) {
+      await wait(1800);
+      r = isExample ? fakeResult(objective) : await SACCADE_LOCAL.analyse(imageURL, objective, targetPt);
+    } else {
+      try {
+        const form = new FormData();
+        form.append("image", imageFile);
+        form.append("objective", objective);
+        if (targetPt) { form.append("target_x", targetPt.x.toFixed(1)); form.append("target_y", targetPt.y.toFixed(1)); }
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), BACKEND_TIMEOUT_MS);
+        const res = await fetch(API_URL, { method: "POST", body: form, signal: ctrl.signal });
+        clearTimeout(timer);
+        if (!res.ok) throw new Error("API error " + res.status);
+        r = await res.json();
+      } catch (apiErr) {
+        console.warn("Backend unavailable, using the in-browser check:", apiErr);
+        r = await SACCADE_LOCAL.analyse(imageURL, objective, targetPt);
+        r.fallback = true;
+      }
     }
     lastResult = r;
+    clearInterval(ticker);
     $("loading").classList.remove("show");
     $("resultsBox").classList.add("show");
     render(r, objective);
   } catch (err) {
+    clearInterval(ticker);
     console.error(err);
-    $("loading").innerHTML = "Something went wrong reading that poster. Please try again.";
+    $("loadingText").textContent = "Something went wrong reading that poster. Please try another image.";
   }
+}
+
+/* ---------- composition tools: music, thirds grid, before/after ---------- */
+$("gridBtn").onclick = () => {
+  const g = $("thirds"), on = g.hasAttribute("hidden");
+  if (on) g.removeAttribute("hidden"); else g.setAttribute("hidden", "");
+  $("gridBtn").setAttribute("aria-pressed", on ? "true" : "false");
+  $("gridBtn").textContent = on ? "▦ Hide grid" : "▦ Thirds grid";
+};
+$("hearBtn").onclick = () => {
+  if (!lastResult) return;
+  const r = lastResult, path = r.eye_path || [];
+  const targetLabel = r.target || (r.elements || []).find(e => e.is_target)?.label || (r.elements || []).find(e => matches(e.label, $("goal").value))?.label;
+  const ti = path.findIndex(p => matches(p.label, targetLabel));
+  const markers = [...document.querySelectorAll(".marker")];
+  const box = $("musicBox"); box.hidden = false;
+  box.innerHTML = `<div class="fix-tag" style="color: var(--accent)">🎵 Playing your poster…</div><p>Each note is a place the eye stops. Higher on the poster = higher note.</p>`;
+  SACCADE_SOUND.play(path, ti, (i, resolved) => {
+    markers.forEach(m => m.classList.remove("ping"));
+    if (i >= 0 && markers[i]) markers[i].classList.add("ping");
+    if (i === -1) box.innerHTML = resolved
+      ? `<div class="fix-tag" style="color: var(--good)">✓ It resolves</div><p>The eye reaches your message early, so the music lands on a warm, finished chord. That's good composition.</p>`
+      : `<div class="fix-tag" style="color: var(--warn)">▲ It doesn't resolve</div><p>The eye reaches your message too late (or never), so the music hangs unfinished. Fix the composition and hear it resolve.</p>`;
+  });
+};
+$("fixedBtn").onclick = async () => {
+  showingFixed = !showingFixed;
+  imageURL = showingFixed ? "sample-poster-fixed.png" : originalURL;
+  const r = showingFixed ? fixedResult() : fakeResult("50% off");
+  lastResult = r;
+  render(r, "50% off");
+  $("fixedBtn").textContent = showingFixed ? "↺ Show the original" : "✨ Show the fixed poster";
+};
+function fixedResult() {
+  return {
+    objective: "50% off", target: "offer",
+    elements: [{ label: "offer", box: [6, 4, 88, 21] }, { label: "photo", box: [6, 28, 88, 39] }, { label: "headline", box: [6, 71, 55, 10] }, { label: "logo", box: [70, 91, 25, 4] }],
+    eye_path: [{ label: "offer", x: 50, y: 13 }, { label: "photo", x: 50, y: 48 }, { label: "headline", x: 30, y: 75 }, { label: "logo", x: 82, y: 93 }],
+    subscores: { focal_match: 25, focal_point: 13, legibility: 12, contrast: 13, clutter: 11, balance: 12 },
+    explanations: {
+      focal_match: "The offer is now the 1st thing people see.", focal_point: "One clear winner: the big offer block.",
+      legibility: "\"50% OFF\" is readable even at phone size.", contrast: "Cream on cherry red stands out strongly.",
+      clutter: "Calm layout with room to breathe.", balance: "Heavy top, calm bottom. It feels intentional."
+    },
+    problems: ["Looks great. Optional: make the date a little bigger."], fixes: [],
+    reading_level: { age: 8, words: 11, seconds: 2, hard_words: 0 },
+    colour_blind: { protan: "pass", deutan: "pass", tritan: "pass" }
+  };
 }
 
 /* ---------- 3 · results ---------- */
@@ -165,6 +241,11 @@ function render(r, objective) {
   renderAnnotations(r, objective);
   renderBreakdown(r);
   saveForGlanceTest(r, objective);
+  $("fixedBtn").hidden = !isExample;
+  $("musicBox").hidden = true;
+  const ln = $("localNote");
+  ln.hidden = !r.local;
+  if (r.local) ln.innerHTML = `<div class="fix-tag" style="color: var(--label)">⚡ Quick in-browser check</div><p>${r.fallback ? "Our AI server was busy, so this" : "This"} result comes from the quick check in your browser (contrast, colour, edges and the "people look at the middle first" effect).${targetPt ? "" : " Tap your message on the poster before checking for a more accurate score."}</p>`;
   renderHexagon(r);
   renderAccessibility(r);
 }
@@ -232,9 +313,10 @@ function renderAnnotations(r, objective) {
   const problems = (r.problems || []).concat(r.fixes || []);
   const colours = ["var(--bad)", "var(--warn)", "var(--ok)"];
   const syms = ["①", "②", "③", "④", "⑤"];
+  const great = Object.values(r.subscores || {}).reduce((x, y) => x + y, 0) >= 85;
   $("fixList").innerHTML = problems.slice(0, 4).map((t, i) => `
     <div class="fix glass">
-      <div class="fix-tag" style="color: ${colours[Math.min(i, 2)]}">${syms[i]} ${i < pins.length ? "Fix here" : "Also try"}</div>
+      <div class="fix-tag" style="color: ${great ? "var(--good)" : colours[Math.min(i, 2)]}">${great ? "✓ Optional" : `${syms[i]} ${i < pins.length ? "Fix here" : "Also try"}`}</div>
       <p>${esc(t)}</p>
     </div>`).join("") || `<div class="fix glass"><div class="fix-tag" style="color: var(--good)">✓ Looks great</div><p>No big problems found.</p></div>`;
 

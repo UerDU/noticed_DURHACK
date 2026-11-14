@@ -87,7 +87,8 @@
           <div class="drop-icon glass" id="dropIcon">
             <svg aria-hidden="true" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#FD9BB7" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"/><path d="M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
           </div>
-          <img id="dropPreview" class="drop-preview" alt="Your poster" hidden>
+          <div class="tap-wrap" id="tapWrap" hidden><img id="dropPreview" class="drop-preview" alt="Your poster. Tap where your message is."><div class="tap-star" id="tapStar" hidden>★</div></div>
+          <div id="tapHint" class="tap-hint" hidden>👆 Tap where your message is on the poster (optional, makes the score more accurate)</div>
           <div id="dropTitle" style="font-size: 20px; font-weight: 700">Drop your file here</div>
           <div class="muted" style="font-size: 15px">or</div>
           <div style="display: flex; gap: 12px; flex-wrap: wrap; justify-content: center">
@@ -119,7 +120,7 @@
 
   <!-- ================= 3 · RESULTS (filled in by app.js) ================= -->
   <section id="results" class="section" aria-live="polite">
-    <div class="loading" id="loading"><div class="spinner"></div>Reading your poster…</div>
+    <div class="loading" id="loading"><div class="spinner"></div><span id="loadingText">Reading your poster…</span></div>
 
     <div class="results" id="resultsBox">
       <div class="res-head">
@@ -140,7 +141,7 @@
       <div class="panel glass-soft">
         <div style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px">
           <h3>Where eyes go, and what to fix</h3>
-          <div style="display: flex; gap: 10px; flex-wrap: wrap"><button type="button" class="btn-ghost mono" id="replayPath" style="font-size: 12px; letter-spacing: 1px">● REPLAY EYE PATH</button><a href="glance.html" class="btn" style="font-size: 14px; padding: 10px 18px">👁 Test it on real eyes</a></div>
+          <div style="display: flex; gap: 10px; flex-wrap: wrap"><button type="button" class="btn-ghost" id="hearBtn">🎵 Hear your poster</button><button type="button" class="btn-ghost" id="gridBtn" aria-pressed="false">▦ Thirds grid</button><button type="button" class="btn-ghost" id="fixedBtn" hidden>✨ Show the fixed poster</button><button type="button" class="btn-ghost mono" id="replayPath" style="font-size: 12px; letter-spacing: 1px">● REPLAY EYE PATH</button><a href="glance.html" class="btn" style="font-size: 14px; padding: 10px 18px">👁 Test it on real eyes</a></div>
         </div>
         <div class="annot-wrap">
           <div class="annot glass">
@@ -149,11 +150,15 @@
               <svg class="annot-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
                 <polyline id="pathLine" fill="none" stroke="#640D14" stroke-opacity="0.75" stroke-width="1.5" vector-effect="non-scaling-stroke" points=""/>
               </svg>
+              <svg class="annot-svg" id="thirds" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true" hidden>
+                <line x1="33.33" y1="0" x2="33.33" y2="100"/><line x1="66.66" y1="0" x2="66.66" y2="100"/>
+                <line x1="0" y1="33.33" x2="100" y2="33.33"/><line x1="0" y1="66.66" x2="100" y2="66.66"/>
+              </svg>
               <div id="markers"></div>
               <div class="gaze" id="gaze" hidden></div>
             </div>
           </div>
-          <div class="fix-list" id="fixList"></div>
+          <div class="fix-list"><div id="musicBox" class="fix glass" hidden></div><div id="localNote" class="fix glass" hidden></div><div id="fixList" style="display: flex; flex-direction: column; gap: 12px"></div></div>
         </div>
       </div>
 
@@ -201,6 +206,8 @@
   </footer>
 </div>
 
+<script src="analyze.js"></script>
+<script src="sound.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

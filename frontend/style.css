@@ -187,6 +187,15 @@ h2.big { margin: 0; font-size: clamp(36px, 4.4vw, 54px); letter-spacing: -1.4px;
 
 footer { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 0 32px 40px; max-width: 1240px; margin: 0 auto; font-size: 14px; color: var(--muted-2); }
 
+/* ---------- tap your message / composition tools ---------- */
+.tap-wrap { position: relative; display: inline-block; cursor: crosshair; }
+.tap-wrap .drop-preview { display: block; }
+.tap-star { position: absolute; width: 34px; height: 34px; margin: -17px 0 0 -17px; border-radius: 50%; background: var(--brown-red); color: var(--pearl);
+  display: grid; place-items: center; font-weight: 900; box-shadow: 0 0 0 4px rgba(173,40,49,0.35), 0 0 20px rgba(173,40,49,0.8); pointer-events: none; }
+.tap-hint { font-size: 14px; color: var(--label); }
+#thirds line { stroke: rgba(255,255,255,0.85); stroke-width: 1; vector-effect: non-scaling-stroke; stroke-dasharray: 4 4; }
+.marker.ping { transform: scale(1.5); box-shadow: 0 0 0 6px rgba(var(--accent-rgb),0.5), 0 0 30px rgba(var(--accent-rgb),0.9); }
+
 /* ---------- scroll reveal (Chrome / Edge) ---------- */
 @keyframes nRise { from { opacity: 0; transform: translateY(80px) scale(0.96); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: no-preference) {
