@@ -164,6 +164,7 @@ function render(r, objective) {
 
   renderAnnotations(r, objective);
   renderBreakdown(r);
+  saveForGlanceTest(r, objective);
   renderHexagon(r);
   renderAccessibility(r);
 }
@@ -171,6 +172,19 @@ function render(r, objective) {
 function countUp(el, target, onStep) {
   let n = 0; const step = Math.max(1, Math.round(target / 30));
   const t = setInterval(() => { n = Math.min(target, n + step); el.textContent = n; onStep && onStep(n); if (n >= target) clearInterval(t); }, 30);
+}
+
+/* keep a small copy of the poster + result so glance.html can test it on real eyes */
+function saveForGlanceTest(r, objective) {
+  const img = new Image();
+  img.onload = () => {
+    const scale = Math.min(1, 900 / Math.max(img.width, img.height));
+    const c = document.createElement("canvas");
+    c.width = Math.round(img.width * scale); c.height = Math.round(img.height * scale);
+    c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+    try { sessionStorage.setItem("saccade:last", JSON.stringify({ image: c.toDataURL("image/jpeg", 0.85), objective, result: r })); } catch (e) {}
+  };
+  img.src = imageURL;
 }
 
 /* annotated poster: eye path boxes, "fix here" pins, moving gaze dot */

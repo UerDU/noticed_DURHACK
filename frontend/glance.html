@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Saccade · Glance Test: AI vs your real eyes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@500;700&display=swap">
+<link rel="stylesheet" href="style.css">
+<style>
+  .gt-wrap { max-width: 1100px; margin: 0 auto; padding: 48px 32px 80px; position: relative; }
+  .gt-card { padding: 32px; border-radius: 32px; }
+  .gt-screen { display: none; }
+  .gt-screen.on { display: block; }
+  .gt-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 28px; }
+  .gt-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin: 24px 0; }
+  .gt-step { padding: 18px; border-radius: 20px; }
+  .gt-step b { display: block; font-size: 17px; margin: 8px 0 4px; }
+  .gt-num { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: var(--bg); font-weight: 800; }
+
+  /* calibration: full screen dots */
+  #calib { position: fixed; inset: 0; z-index: 50; background: var(--bg); display: none; }
+  #calib.on { display: block; }
+  .cal-dot { position: absolute; width: 34px; height: 34px; margin: -17px 0 0 -17px; border-radius: 50%; border: 0; cursor: pointer;
+    background: radial-gradient(circle, var(--accent) 0 35%, rgba(var(--accent-rgb),0.3) 36% 100%); box-shadow: 0 0 24px rgba(var(--accent-rgb),0.8); }
+  .cal-dot.done { background: var(--good); box-shadow: 0 0 18px rgba(48,209,88,0.8); pointer-events: none; }
+  .cal-msg { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); text-align: center; max-width: 480px; pointer-events: none; }
+
+  /* the 3-second look */
+  #look { position: fixed; inset: 0; z-index: 50; background: #000; display: none; place-items: center; }
+  #look.on { display: grid; }
+  #lookImg { max-height: 92vh; max-width: 92vw; display: block; }
+  .count { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); font-family: var(--mono); font-size: 14px; letter-spacing: 2px; color: var(--muted); }
+
+  /* results */
+  .cmp { display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-start; }
+  .cmp-poster { position: relative; flex: 0 1 440px; max-width: 100%; border-radius: 18px; padding: 14px; }
+  .cmp-box { position: relative; border-radius: 12px; overflow: hidden; }
+  .cmp-box img { display: block; width: 100%; height: auto; }
+  .cmp-box svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  .heat { position: absolute; width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%; pointer-events: none;
+    background: radial-gradient(circle, rgba(var(--accent-rgb),0.55), rgba(var(--accent-rgb),0) 70%); }
+  .tag { position: absolute; width: 30px; height: 30px; margin: -15px 0 0 -15px; display: grid; place-items: center; font-family: var(--mono); font-size: 11px; font-weight: 800; }
+  .tag.ai { border: 1.5px dashed var(--pearl); color: var(--pearl); background: rgba(18,7,9,0.7); }
+  .tag.you { border-radius: 50%; background: var(--accent); color: var(--bg); }
+  .cmp-side { flex: 1 1 360px; min-width: 0; display: flex; flex-direction: column; gap: 16px; }
+  .seq { display: grid; grid-template-columns: 70px 1fr; gap: 8px 14px; align-items: center; font-size: 15px; }
+  .seq-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .pill { padding: 6px 10px; border-radius: 10px; font-family: var(--mono); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+  .pill.ai { border: 1.5px dashed var(--pearl); }
+  .pill.you { background: rgba(var(--accent-rgb),0.25); border: 1.5px solid var(--accent); }
+  .pill.match { box-shadow: 0 0 0 2px var(--good); }
+  .big-num { font-size: 64px; font-weight: 800; line-height: 1; }
+  .board { display: flex; gap: 18px; flex-wrap: wrap; }
+  .board > div { flex: 1 1 160px; padding: 18px; border-radius: 20px; }
+  .note { font-size: 13px; color: var(--muted-2); line-height: 1.5; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="glows">
+    <div aria-hidden="true" style="position: absolute; top: -260px; left: -200px; width: 820px; height: 820px; border-radius: 50%; background: #640D14; opacity: 0.55; filter: blur(170px)"></div>
+    <div aria-hidden="true" style="position: absolute; top: -120px; right: -260px; width: 760px; height: 760px; border-radius: 50%; background: #AD2831; opacity: 0.6; filter: blur(170px)"></div>
+    <div aria-hidden="true" style="position: absolute; top: 500px; left: 30%; width: 520px; height: 520px; border-radius: 50%; background: #FD9BB7; opacity: 0.2; filter: blur(160px)"></div>
+  </div>
+
+  <div class="gt-wrap">
+    <div class="gt-top">
+      <a href="index.html" class="btn-ghost">← Back to Saccade</a>
+      <span class="eyebrow">Glance Test</span>
+    </div>
+
+    <!-- 1 · INTRO -->
+    <section class="gt-screen on" id="sIntro">
+      <div class="gt-card glass-soft">
+        <div class="eyebrow">Does the AI see like you do?</div>
+        <h1 style="margin: 10px 0 8px; font-size: clamp(36px, 5vw, 58px); letter-spacing: -1.5px; line-height: 1.05">Saccade predicted where eyes go. <span class="serif">Now let's test it on yours.</span></h1>
+        <p class="muted" style="font-size: 18px; max-width: 680px; margin: 0">You'll look at a poster for <b style="color: var(--text)">3 seconds</b>. Your webcam roughly follows your eyes, and then we compare your real eye path with the AI's prediction.</p>
+        <div class="gt-steps">
+          <div class="gt-step glass"><span class="gt-num">1</span><b>Allow the camera</b><span class="muted" style="font-size: 14px">It stays in this browser. Nothing is saved or sent anywhere.</span></div>
+          <div class="gt-step glass"><span class="gt-num">2</span><b>Click 9 dots</b><span class="muted" style="font-size: 14px">Look at each dot and click it. This teaches the tracker your eyes (about 20 s).</span></div>
+          <div class="gt-step glass"><span class="gt-num">3</span><b>Glance for 3 seconds</b><span class="muted" style="font-size: 14px">Look at the poster naturally, like you're walking past it.</span></div>
+        </div>
+        <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center">
+          <button type="button" class="btn" id="startBtn">Start with my camera</button>
+          <button type="button" class="btn-ghost" id="mouseBtn">No camera? Use my mouse instead</button>
+        </div>
+        <p class="note" style="margin-top: 14px">🔒 Privacy: the camera is only on during the test, runs entirely in your browser, and turns off at the end. No video, photos or face data ever leave your device.<br>Webcam eye tracking is rough (it's accurate to a few centimetres), which is enough to tell the logo from the offer, not individual words.</p>
+        <p class="note" id="posterNote"></p>
+      </div>
+    </section>
+
+    <!-- 4 · RESULTS -->
+    <section class="gt-screen" id="sResult">
+      <div class="gt-card glass-soft">
+        <div class="eyebrow">Your result</div>
+        <h2 id="resHead" style="margin: 8px 0 22px; font-size: clamp(30px, 4vw, 46px); letter-spacing: -1.2px; line-height: 1.08">—</h2>
+        <div class="cmp">
+          <div class="cmp-poster glass">
+            <div class="cmp-box" id="cmpBox">
+              <img id="cmpImg" alt="The poster you looked at">
+              <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+                <polyline id="aiLine" fill="none" stroke="#F3E6BD" stroke-width="1.5" stroke-dasharray="4 3" vector-effect="non-scaling-stroke" points=""/>
+                <polyline id="youLine" fill="none" stroke="#FD9BB7" stroke-width="2.5" vector-effect="non-scaling-stroke" points=""/>
+              </svg>
+              <div id="heatLayer"></div>
+              <div id="tagLayer"></div>
+            </div>
+          </div>
+          <div class="cmp-side">
+            <div class="glass" style="padding: 20px; border-radius: 22px; display: flex; gap: 20px; align-items: center">
+              <div class="big-num" id="matchNum">–</div>
+              <div><b style="font-size: 18px">match with the AI</b><div class="muted" style="font-size: 14px" id="matchSub"></div></div>
+            </div>
+            <div class="glass" style="padding: 20px; border-radius: 22px">
+              <div class="seq">
+                <span class="mono" style="font-size: 12px; color: var(--label)">AI ▢</span><div class="seq-row" id="aiSeq"></div>
+                <span class="mono" style="font-size: 12px; color: var(--accent)">YOU ●</span><div class="seq-row" id="youSeq"></div>
+              </div>
+              <p class="note" style="margin: 12px 0 0">Dashed squares = where the AI predicted eyes would go. Pink circles = where your eyes actually went, in order. Green outline = you agreed.</p>
+            </div>
+            <div class="glass" style="padding: 20px; border-radius: 22px" id="msgBox"></div>
+            <div style="display: flex; gap: 12px; flex-wrap: wrap">
+              <button type="button" class="btn" id="againBtn">Next person ↻</button>
+              <a href="index.html#results" class="btn-ghost">Back to results</a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="board" style="margin-top: 24px">
+        <div class="glass"><div class="eyebrow">People tested</div><div class="big-num" id="bPeople" style="font-size: 44px">0</div></div>
+        <div class="glass"><div class="eyebrow">AI matched humans</div><div class="big-num" id="bAvg" style="font-size: 44px">–</div></div>
+        <div class="glass"><div class="eyebrow">Saw the message in the first 2 looks</div><div class="big-num" id="bTarget" style="font-size: 44px">–</div></div>
+      </div>
+      <p class="note" style="margin-top: 10px">These totals stay on this laptop only (so you can quote them in your pitch). <button type="button" class="btn-ghost" id="resetBoard" style="min-height: 32px; padding: 4px 12px; font-size: 12px">Reset</button></p>
+    </section>
+  </div>
+</div>
+
+<!-- 2 · CALIBRATION -->
+<div id="calib" aria-live="polite">
+  <div class="cal-msg">
+    <div class="eyebrow">Step 2 of 3</div>
+    <h2 style="margin: 8px 0">Look at each dot and click it</h2>
+    <p class="muted" id="calCount">9 dots left</p>
+  </div>
+  <div id="dots"></div>
+</div>
+
+<!-- 3 · THE 3-SECOND LOOK -->
+<div id="look"><div class="count" id="countTxt">Look at the poster</div><img id="lookImg" alt="Poster to look at"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/webgazer@3.5.3/dist/webgazer.js"></script>
+<script src="glance.js"></script>
+</body>
+</html>
