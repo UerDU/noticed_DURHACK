@@ -2,6 +2,7 @@
 # Everything here is a STUB returning fake data, so the server works today.
 # Replace the insides of each function with the real thing. Do NOT change the names or return format.
 
+
 def get_eye_path(image_path):
     """Run the saliency model (DeepGaze / UMSI), find the top peaks in order.
     Return a list of points in PERCENT of image width/height, in viewing order:
