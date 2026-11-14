@@ -1,10 +1,14 @@
 /* =========================================================
-   Noticed · frontend logic (D)
+   Saccade · frontend logic (D)
    ========================================================= */
 
 /* ---------- CONFIG: change these at integration ---------- */
-const USE_FAKE = true;                              // set false once C's API is running
-const API_URL  = "http://localhost:8000/analyse";   // C's endpoint
+// Fake data by default. Add ?live to the address to use C's real API:
+//   index.html?live                                  -> http://localhost:8000/analyse
+//   index.html?live&api=http://192.168.1.20:8000     -> another laptop on the same wifi
+const params   = new URLSearchParams(location.search);
+const USE_FAKE = !params.has("live");
+const API_URL  = (params.get("api") || "http://localhost:8000") + "/analyse";
 
 // Max points per check. Must match the backend (see README).
 const MAX = { focal_match: 25, focal_point: 15, legibility: 15, contrast: 15, clutter: 15, balance: 15 };
@@ -173,7 +177,7 @@ function countUp(el, target, onStep) {
 function renderAnnotations(r, objective) {
   $("annotImg").src = imageURL;
   const path = r.eye_path || [];
-  const targetLabel = r.target || (r.elements || []).find(e => matches(e.label, objective))?.label;
+  const targetLabel = r.target || (r.elements || []).find(e => e.is_target)?.label || (r.elements || []).find(e => matches(e.label, objective))?.label;
   const isTarget = (label) => matches(label, targetLabel);
 
   $("pathLine").setAttribute("points", path.map(p => `${p.x},${p.y}`).join(" "));
