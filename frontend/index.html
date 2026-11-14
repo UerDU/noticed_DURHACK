@@ -1,291 +1,206 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Noticed — Composition Critic</title>
-<style>
-  :root {
-    --bg: #0f1115; --panel: #181b22; --line: #2a2f3a; --text: #eef0f4; --muted: #9aa3b2;
-    --accent: #ffcc33; --green: #3ecf8e; --yellow: #ffcc33; --orange: #ff9a3c; --red: #ff5c5c;
-  }
-  * { box-sizing: border-box; }
-  body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background: var(--bg); color: var(--text); }
-  header { padding: 20px 24px; border-bottom: 1px solid var(--line); display: flex; align-items: baseline; gap: 12px; }
-  header h1 { margin: 0; font-size: 22px; letter-spacing: -0.5px; }
-  header span { color: var(--muted); font-size: 14px; }
-  main { max-width: 1100px; margin: 0 auto; padding: 24px; display: grid; grid-template-columns: 1.2fr 1fr; gap: 24px; }
-  @media (max-width: 800px) { main { grid-template-columns: 1fr; padding: 16px; } }
-  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; }
-  label { display: block; font-size: 13px; color: var(--muted); margin: 0 0 6px; }
-
-  /* Upload */
-  #drop { border: 2px dashed var(--line); border-radius: 12px; padding: 28px; text-align: center; cursor: pointer; color: var(--muted); transition: border-color .2s; }
-  #drop.over, #drop:hover { border-color: var(--accent); color: var(--text); }
-  #objective { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--line); background: #11141a; color: var(--text); font-size: 15px; margin-top: 14px; }
-  button { margin-top: 14px; width: 100%; padding: 13px; border: 0; border-radius: 10px; background: var(--accent); color: #111; font-weight: 700; font-size: 15px; cursor: pointer; }
-  button:disabled { opacity: .5; cursor: not-allowed; }
-  button.ghost { background: transparent; color: var(--text); border: 1px solid var(--line); font-weight: 500; }
-
-  /* Image + overlay */
-  #stage { position: relative; margin-top: 16px; display: none; border-radius: 10px; overflow: hidden; }
-  #stage img { display: block; width: 100%; height: auto; }
-  #stage .dim { position: absolute; inset: 0; background: rgba(0,0,0,.25); }
-  #stage svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
-  .box { position: absolute; border: 2px dashed rgba(255,255,255,.55); border-radius: 6px; }
-  .box.target { border: 2px solid var(--accent); box-shadow: 0 0 0 9999px rgba(0,0,0,0); }
-  .box span { position: absolute; top: -22px; left: -2px; font-size: 11px; padding: 2px 6px; border-radius: 4px; background: rgba(0,0,0,.7); white-space: nowrap; }
-  .box.target span { background: var(--accent); color: #111; font-weight: 700; }
-  .marker { position: absolute; width: 30px; height: 30px; margin: -15px 0 0 -15px; border-radius: 50%; background: #fff; color: #111; font-weight: 800; font-size: 14px; display: grid; place-items: center; opacity: 0; transform: scale(.4); transition: opacity .25s, transform .25s; box-shadow: 0 2px 10px rgba(0,0,0,.5); }
-  .marker.show { opacity: 1; transform: scale(1); }
-  .marker.target { background: var(--accent); }
-  #gaze { position: absolute; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%; background: radial-gradient(circle, rgba(255,204,51,1) 0%, rgba(255,204,51,.5) 45%, rgba(255,204,51,0) 75%); box-shadow: 0 0 25px 10px rgba(255,204,51,.45); transition: left .7s ease-in-out, top .7s ease-in-out, opacity .3s; opacity: 0; }
-
-  /* Results */
-  #results { display: none; }
-  .score-wrap { display: flex; align-items: center; gap: 18px; }
-  .ring { --pct: 0; --col: var(--accent); width: 110px; height: 110px; border-radius: 50%; display: grid; place-items: center; background: conic-gradient(var(--col) calc(var(--pct) * 1%), var(--line) 0); flex-shrink: 0; }
-  .ring div { width: 86px; height: 86px; border-radius: 50%; background: var(--panel); display: grid; place-items: center; font-size: 32px; font-weight: 800; }
-  .band { font-size: 20px; font-weight: 700; }
-  .band-sub { color: var(--muted); font-size: 14px; margin-top: 4px; }
-  h3 { margin: 22px 0 10px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); }
-  .bar { margin-bottom: 10px; }
-  .bar-top { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 4px; }
-  .bar-top b { font-variant-numeric: tabular-nums; }
-  .track { height: 8px; background: var(--line); border-radius: 99px; overflow: hidden; }
-  .fill { height: 100%; width: 0; border-radius: 99px; transition: width .8s ease; }
-  ol, ul { margin: 0; padding-left: 20px; }
-  li { margin-bottom: 8px; line-height: 1.4; }
-  .placeholder { color: var(--muted); text-align: center; padding: 40px 10px; }
-  .spinner { width: 28px; height: 28px; border: 3px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 12px; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-</style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Saccade · Make your poster impossible to miss</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@500;700&display=swap">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="opening.css">
 </head>
 <body>
-<header>
-  <h1>👁️ Noticed</h1>
-  <span>You tell us what you want to communicate. We help make sure your audience understands it.</span>
-</header>
+<!-- colour-blind simulation filters (used on the results thumbnails) -->
+<svg aria-hidden="true" width="0" height="0" style="position: absolute">
+  <filter id="cbP"><feColorMatrix type="matrix" values="0.567 0.433 0 0 0  0.558 0.442 0 0 0  0 0.242 0.758 0 0  0 0 0 1 0"/></filter>
+  <filter id="cbD"><feColorMatrix type="matrix" values="0.625 0.375 0 0 0  0.7 0.3 0 0 0  0 0.3 0.7 0 0  0 0 0 1 0"/></filter>
+  <filter id="cbT"><feColorMatrix type="matrix" values="0.95 0.05 0 0 0  0 0.433 0.567 0 0  0 0.475 0.525 0 0  0 0 0 1 0"/></filter>
+</svg>
 
-<main>
-  <!-- LEFT: input + image -->
-  <section class="panel">
-    <div id="drop">📤 <b>Upload a poster or post</b><br><small>Click or drag an image here</small></div>
-    <input type="file" id="file" accept="image/*" hidden />
+<div class="page">
+  <div class="glows">
+  <div aria-hidden="true" style="position: absolute; top: -260px; left: -200px; width: 820px; height: 820px; border-radius: 50%; background: #640D14; opacity: 0.55; filter: blur(170px)"></div>
+  <div aria-hidden="true" style="position: absolute; top: -120px; right: -260px; width: 760px; height: 760px; border-radius: 50%; background: #AD2831; opacity: 0.6; filter: blur(170px)"></div>
+  <div aria-hidden="true" style="position: absolute; top: 300px; left: 36%; width: 520px; height: 520px; border-radius: 50%; background: #FD9BB7; opacity: 0.22; filter: blur(160px)"></div>
+  <div aria-hidden="true" style="position: absolute; top: 500px; left: 6%; width: 420px; height: 420px; border-radius: 50%; background: #D8973C; opacity: 0.3; filter: blur(150px)"></div>
+  <div aria-hidden="true" style="position: absolute; top: 1100px; right: -160px; width: 620px; height: 620px; border-radius: 50%; background: #FD9BB7; opacity: 0.22; filter: blur(170px)"></div>
+  <div aria-hidden="true" style="position: absolute; top: 1700px; left: -180px; width: 640px; height: 640px; border-radius: 50%; background: #640D14; opacity: 0.45; filter: blur(180px)"></div>
+  <div aria-hidden="true" style="position: absolute; top: 2400px; right: 10%; width: 560px; height: 520px; border-radius: 50%; background: #D8973C; opacity: 0.25; filter: blur(160px)"></div>
+  <div aria-hidden="true" style="position: absolute; top: 3200px; left: 20%; width: 620px; height: 600px; border-radius: 50%; background: #AD2831; opacity: 0.4; filter: blur(180px)"></div>
 
-    <label for="objective" style="margin-top:14px">What should people notice first?</label>
-    <input id="objective" placeholder="e.g. 50% discount, event date, new product" />
+  </div>
 
-    <button id="analyse" disabled>Analyse composition</button>
-
-    <div id="stage">
-      <img id="img" alt="Uploaded design" />
-      <div class="dim"></div>
-      <div id="boxes"></div>
-      <svg viewBox="0 0 100 100" preserveAspectRatio="none">
-        <polyline id="pathline" fill="none" stroke="rgba(255,204,51,.8)" stroke-width="2" stroke-dasharray="4 3" vector-effect="non-scaling-stroke" points="" />
-      </svg>
-      <div id="markers"></div>
-      <div id="gaze"></div>
-    </div>
-    <button id="replay" class="ghost" style="display:none">▶ Replay eye path</button>
-  </section>
-
-  <!-- RIGHT: results -->
-  <section class="panel">
-    <div id="empty" class="placeholder">Upload a design and tell us what matters. We'll show where eyes actually go.</div>
-    <div id="loading" class="placeholder" style="display:none"><div class="spinner"></div>Reading your design…</div>
-    <div id="results">
-      <div class="score-wrap">
-        <div class="ring" id="ring"><div id="total">0</div></div>
-        <div>
-          <div class="band" id="band">–</div>
-          <div class="band-sub" id="bandSub"></div>
+  <!-- ================= 1 · OPENING (plays on load) ================= -->
+  <header id="top">
+    <div style="position: relative; max-width: 1280px; margin: 0 auto; padding: 28px 32px; box-sizing: border-box; min-height: 760px">
+      <p class="settle" style="margin: 0 auto 20px; max-width: 720px; text-align: center; font-size: 36px; line-height: 1.12; letter-spacing: -1px; font-weight: 700">“<span class="word" style="animation-delay: 0.30s">Nobody</span> <span class="word" style="animation-delay: 0.46s">reads</span> <span class="word" style="animation-delay: 0.62s">your</span> <span class="word" style="animation-delay: 0.78s">poster.</span><br><span class="word" style="animation-delay: 1.19s; font-family: 'Instrument Serif', serif; font-style: italic; font-weight: 400; color: #FD9BB7">They</span> <span class="word" style="animation-delay: 1.35s; font-family: 'Instrument Serif', serif; font-style: italic; font-weight: 400; color: #FD9BB7">glance</span> <span class="word" style="animation-delay: 1.51s; font-family: 'Instrument Serif', serif; font-style: italic; font-weight: 400; color: #FD9BB7">at</span> <span class="word" style="animation-delay: 1.67s; font-family: 'Instrument Serif', serif; font-style: italic; font-weight: 400; color: #FD9BB7">it.</span>”</p>
+      <div style="display: flex; flex-wrap: wrap; gap: 40px; align-items: center">
+        <div class="wallin" style="flex: 1 1 600px; min-width: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; align-items: center">
+          <div class="dim" aria-hidden="true" style="height: 168px; border-radius: 16px; overflow: hidden; position: relative; box-sizing: border-box; padding: 16px; background: #AD2831; filter: blur(14px); opacity: 0.4; "><div style="position: absolute; inset: 0; background: repeating-linear-gradient(135deg, rgba(255,255,255,0.14) 0 14px, transparent 14px 28px)"></div><div style="position: relative; font-size: 11px; font-weight: 800; letter-spacing: 2px; color: #F3E6BD">WEEKEND SALE</div><div style="position: relative; font-size: 76px; font-weight: 900; line-height: 0.9; margin-top: 28px; color: #FFFFFF">50%</div><div style="position: absolute; right: 14px; bottom: 14px; width: 54px; height: 54px; border-radius: 50%; background: #640D14; color: #FFFFFF; display: grid; place-items: center; font-weight: 800">OFF</div></div><div class="dim" aria-hidden="true" style="height: 168px; border-radius: 16px; overflow: hidden; position: relative; box-sizing: border-box; padding: 16px; background: #AD2831; filter: blur(14px); opacity: 0.4; "><div style="position: absolute; right: -30px; top: -30px; width: 150px; height: 150px; border-radius: 50%; background: #D8973C"></div><div style="position: absolute; left: 0; right: 0; bottom: 40px; height: 40px; background: repeating-linear-gradient(90deg, #F3E6BD 0 2px, transparent 2px 10px); opacity: 0.6"></div><div style="position: relative; font-family: 'Instrument Serif', serif; font-style: italic; font-weight: 400; font-size: 38px; line-height: 1; color: #F3E6BD; margin-top: 70px">Jazz Night</div></div><div class="dim" aria-hidden="true" style="height: 168px; border-radius: 16px; overflow: hidden; position: relative; box-sizing: border-box; padding: 16px; background: #FD9BB7; filter: blur(14px); opacity: 0.4; "><div style="position: absolute; inset: 0; background-image: radial-gradient(circle, rgba(255,255,255,0.8) 2px, transparent 3px), radial-gradient(circle, #AD2831 3px, transparent 4px); background-size: 26px 26px, 38px 38px; background-position: 0 0, 12px 18px"></div><div style="position: absolute; left: -10px; right: -10px; top: 80px; height: 46px; background: #AD2831; transform: rotate(-6deg)"></div><div style="position: absolute; left: 16px; top: 88px; font-size: 24px; font-weight: 900; color: #640D14; transform: rotate(-6deg)">GRAND OPENING</div></div><div class="dim" aria-hidden="true" style="height: 168px; border-radius: 16px; overflow: hidden; position: relative; box-sizing: border-box; padding: 16px; background: #6E1E3B; filter: blur(14px); opacity: 0.4; "><div style="position: absolute; left: 50%; top: 52%; width: 120px; height: 120px; margin: -60px 0 0 -60px; border-radius: 50%; background: radial-gradient(circle, #E8DFD0 0 30%, rgba(255,255,255,0.3) 31% 46%, #1A1919 47% 100%)"></div><div style="position: relative; font-family: 'Instrument Serif', serif; font-style: italic; font-weight: 400; font-size: 30px; color: #E8DFD0">New Menu</div></div><div style="display: grid; place-items: center; position: relative; z-index: 2"><div style="transform: scale(0.68)"><div class="focus"><div style="width: 330px; padding: 16px; border-radius: 28px; background: linear-gradient(140deg, rgba(255,255,255,0.3), rgba(255,255,255,0.1) 55%, rgba(255,255,255,0.18)); border: 1px solid rgba(255,255,255,0.42); backdrop-filter: blur(30px) saturate(180%); -webkit-backdrop-filter: blur(30px) saturate(180%); box-shadow: 0 30px 90px rgba(18,7,9,0.65), inset 0 1px 0 rgba(255,255,255,0.35)"><div style="position: relative; height: 400px; border-radius: 16px; overflow: hidden; background: radial-gradient(circle at 85% 8%, rgba(173,40,49,0.18), transparent 40%), #F3E6BD; color: #640D14">
+          <div style="position: absolute; top: 14px; left: 20px; display: flex; align-items: baseline; gap: 8px">
+            <span style="font-family: 'Instrument Serif', serif; font-style: italic; font-weight: 400; font-size: 46px; line-height: 1; letter-spacing: -1px">Bloom</span>
+            <span style="font-size: 12px; font-weight: 800; letter-spacing: 3px">CAFÉ</span>
+          </div>
+          <div style="position: absolute; top: 74px; left: 20px; right: 20px; height: 176px; border-radius: 14px; overflow: hidden; background: radial-gradient(circle at 75% 25%, #FD9BB7, #AD2831 70%)">
+            <div style="position: absolute; left: 0; right: 0; bottom: 0; height: 52px; background: linear-gradient(180deg, rgba(0,0,0,0.12), rgba(0,0,0,0.28))"></div>
+            <div style="position: absolute; left: 40px; bottom: 22px; width: 180px; height: 34px; border-radius: 50%; background: #F3E6BD; box-shadow: 0 6px 14px rgba(0,0,0,0.25)"></div>
+            <div style="position: absolute; left: 58px; bottom: 34px; width: 88px; height: 34px; border-radius: 50% / 60%; background: repeating-linear-gradient(100deg, #E9A35B 0 9px, #C2742F 9px 12px); transform: rotate(-12deg); box-shadow: inset 0 -6px 8px rgba(0,0,0,0.2)"></div>
+            <div style="position: absolute; left: 120px; bottom: 30px; width: 76px; height: 30px; border-radius: 50% / 60%; background: repeating-linear-gradient(80deg, #F0B46C 0 8px, #C9803A 8px 11px); transform: rotate(10deg); box-shadow: inset 0 -6px 8px rgba(0,0,0,0.2)"></div>
+            <div style="position: absolute; right: 30px; bottom: 26px; width: 58px; height: 50px; border-radius: 4px 4px 26px 26px; background: #640D14"></div>
+            <div style="position: absolute; right: 16px; bottom: 44px; width: 22px; height: 22px; border-radius: 50%; border: 6px solid #640D14; box-sizing: border-box"></div>
+            <div style="position: absolute; right: 40px; bottom: 82px; width: 10px; height: 34px; border-left: 3px solid rgba(255,255,255,0.7); border-radius: 50%"></div>
+            <div style="position: absolute; right: 54px; bottom: 86px; width: 10px; height: 40px; border-right: 3px solid rgba(255,255,255,0.6); border-radius: 50%"></div>
+          </div>
+          <div style="position: absolute; top: 272px; left: 20px; right: 20px">
+            <div style="font-family: 'Instrument Serif', serif; font-style: italic; font-weight: 400; font-size: 24px; line-height: 1.1">Fresh pastries,</div>
+            <div style="font-size: 13px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; margin-top: 4px; opacity: 0.75">all weekend long</div>
+          </div>
+          <div style="position: absolute; left: 20px; right: 20px; bottom: 52px; height: 1px; background: rgba(100,13,20,0.25)"></div>
+          <div style="position: absolute; bottom: 22px; left: 20px; font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; opacity: 0.7">12 Elvet Bridge</div>
+          <div style="position: absolute; bottom: 22px; right: 20px; font-size: 11px; font-weight: 700; color: #640D14">50% off Sat–Sun</div>
+          <svg aria-hidden="true" width="298" height="400" viewBox="0 0 298 400" style="position: absolute; inset: 0"><polyline class="draw" style="animation-delay: 4.6s; animation-duration: 1.4s" points="110,42 149,180 105,288 238,366" fill="none" stroke="#AD2831" stroke-opacity="0.75" stroke-width="1.5" stroke-dasharray="1200" stroke-dashoffset="0"></polyline></svg>
+          <div class="fade" style="animation-delay: 5.0s"><div style="position: absolute; left: 93px; top: 25px; width: 34px; height: 34px; box-sizing: border-box; border: 1.5px solid #AD2831; background: rgba(243,230,189,0.82); color: #AD2831; box-shadow: 0 0 12px rgba(173,40,49,0.45); display: grid; place-items: center; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700">01<span style="position: absolute; left: -5px; top: -5px; width: 7px; height: 7px; box-sizing: border-box; border: 1.5px solid #AD2831; background: #F3E6BD"></span><span style="position: absolute; right: -5px; top: -5px; width: 7px; height: 7px; box-sizing: border-box; border: 1.5px solid #AD2831; background: #F3E6BD"></span><span style="position: absolute; left: -5px; bottom: -5px; width: 7px; height: 7px; box-sizing: border-box; border: 1.5px solid #AD2831; background: #F3E6BD"></span><span style="position: absolute; right: -5px; bottom: -5px; width: 7px; height: 7px; box-sizing: border-box; border: 1.5px solid #AD2831; background: #F3E6BD"></span></div><div style="position: absolute; left: 134px; top: 35px; width: 90px; font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #AD2831">logo</div></div><div class="fade" style="animation-delay: 5.35s"><div style="position: absolute; left: 132px; top: 163px; width: 34px; height: 34px; box-sizing: border-box; border: 1.5px solid #640D14; background: rgba(243,230,189,0.82); color: #640D14; box-shadow: 0 0 12px rgba(100,13,20,0.45); display: grid; place-items: center; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700">02<span style="position: absolute; left: -5px; top: -5px; width: 7px; height: 7px; box-sizing: border-box; border: 1.5px solid #640D14; background: #F3E6BD"></span><span style="position: absolute; right: -5px; top: -5px; width: 7px; height: 7px; box-sizing: border-box; border: 1.5px solid #640D14; background: #F3E6BD"></span><span style="position: absolute; left: -5px; bottom: -5px; width: 7px; height: 7px; box-sizing: border-box; border: 1.5px solid #640D14; background: #F3E6BD"></span><span style="position: absolute; right: -5px; bottom: -5px; width: 7px; height: 7px; box-sizing: border-box; border: 1.5px solid #640D14; background: #F3E6BD"></span></div><div style="position: absolute; left: 173px; top: 173px; width: 90px; font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #640D14">photo</div></div><div class="fade" style="animation-delay: 5.7s"><div style="position: absolute; left: 88px; top: 271px; width: 34px; height: 34px; box-sizing: border-box; border: 1.5px solid #6E1E3B; background: rgba(243,230,189,0.82); color: #6E1E3B; box-shadow: 0 0 12px rgba(110,30,59,0.45); display: grid; place-items: center; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700">03<span style="position: absolute; left: -5px; top: -5px; width: 7px; height: 7px; box-sizing: border-box; border: 1.5px solid #6E1E3B; background: #F3E6BD"></span><span style="position: absolute; right: -5px; top: -5px; width: 7px; height: 7px; box-sizing: border-box; border: 1.5px solid #6E1E3B; background: #F3E6BD"></span><span style="position: absolute; left: -5px; bottom: -5px; width: 7px; height: 7px; box-sizing: border-box; border: 1.5px solid #6E1E3B; background: #F3E6BD"></span><span style="position: absolute; right: -5px; bottom: -5px; width: 7px; height: 7px; box-sizing: border-box; border: 1.5px solid #6E1E3B; background: #F3E6BD"></span></div><div style="position: absolute; left: 129px; top: 281px; width: 90px; font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #6E1E3B">headline</div></div><div class="fade" style="animation-delay: 6.1s"><div style="position: absolute; left: 221px; top: 349px; width: 34px; height: 34px; box-sizing: border-box; border: 1.5px solid #8A4B12; background: #8A4B12; color: #F3E6BD; box-shadow: 0 0 0 3px rgba(138,75,18,0.25), 0 0 18px rgba(138,75,18,0.75); display: grid; place-items: center; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700">04<span style="position: absolute; left: -5px; top: -5px; width: 7px; height: 7px; box-sizing: border-box; border: 1.5px solid #8A4B12; background: #F3E6BD"></span><span style="position: absolute; right: -5px; top: -5px; width: 7px; height: 7px; box-sizing: border-box; border: 1.5px solid #8A4B12; background: #F3E6BD"></span><span style="position: absolute; left: -5px; bottom: -5px; width: 7px; height: 7px; box-sizing: border-box; border: 1.5px solid #8A4B12; background: #F3E6BD"></span><span style="position: absolute; right: -5px; bottom: -5px; width: 7px; height: 7px; box-sizing: border-box; border: 1.5px solid #8A4B12; background: #F3E6BD"></span></div><div style="position: absolute; left: 124px; text-align: right; top: 359px; width: 90px; font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #8A4B12">★ offer</div></div>
+        </div></div></div></div></div><div class="dim" aria-hidden="true" style="height: 168px; border-radius: 16px; overflow: hidden; position: relative; box-sizing: border-box; padding: 16px; background: #640D14; filter: blur(14px); opacity: 0.4; "><div style="position: absolute; left: 30%; top: 0; width: 40%; height: 100%; background: linear-gradient(180deg, rgba(253,155,183,0.5), transparent); clip-path: polygon(40% 0, 60% 0, 100% 100%, 0 100%)"></div><div style="position: absolute; left: 50%; top: 70px; width: 34px; height: 46px; margin-left: -17px; border-radius: 17px; background: #FD9BB7"></div><div style="position: absolute; left: 50%; top: 116px; width: 6px; height: 40px; margin-left: -3px; background: #FD9BB7"></div><div style="position: relative; font-size: 22px; font-weight: 900; letter-spacing: 1px; color: #FD9BB7">OPEN MIC</div></div><div class="dim" aria-hidden="true" style="height: 168px; border-radius: 16px; overflow: hidden; position: relative; box-sizing: border-box; padding: 16px; background: #F3E6BD; filter: blur(14px); opacity: 0.4; "><div style="position: absolute; left: 24px; bottom: 20px; width: 26px; height: 110px; background: #AD2831; border-radius: 3px"></div><div style="position: absolute; left: 54px; bottom: 20px; width: 22px; height: 90px; background: #D8973C; border-radius: 3px"></div><div style="position: absolute; left: 80px; bottom: 20px; width: 30px; height: 124px; background: #AD2831; border-radius: 3px"></div><div style="position: absolute; left: 114px; bottom: 20px; width: 24px; height: 100px; background: #6E1E3B; border-radius: 3px; transform: rotate(8deg); transform-origin: bottom left"></div><div style="position: relative; font-size: 20px; font-weight: 900; color: #640D14">BOOK SWAP</div></div><div class="dim" aria-hidden="true" style="height: 168px; border-radius: 16px; overflow: hidden; position: relative; box-sizing: border-box; padding: 16px; background: #FD9BB7; filter: blur(14px); opacity: 0.4; "><div style="position: absolute; left: 50%; top: 58%; width: 150px; height: 150px; margin: -75px 0 0 -75px; border-radius: 50%; background: repeating-radial-gradient(circle, #D8973C 0 6px, transparent 6px 14px); opacity: 0.6"></div><div style="position: relative; font-size: 20px; font-weight: 800; letter-spacing: 3px; color: #640D14">YOGA CLUB</div></div><div class="dim" aria-hidden="true" style="height: 168px; border-radius: 16px; overflow: hidden; position: relative; box-sizing: border-box; padding: 16px; background: #D8973C; filter: blur(14px); opacity: 0.4; "><div style="position: absolute; inset: 0; background-image: linear-gradient(rgba(255,255,255,0.18) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.18) 1px, transparent 1px); background-size: 22px 22px"></div><div style="position: relative; font-size: 34px; font-weight: 900; line-height: 0.95; color: #FFFFFF; margin-top: 60px">FLEA<br>MARKET</div></div>
+        </div>
+        <div class="up" style="animation-delay: 6.3s; flex: 1 1 360px; min-width: 0; display: flex; flex-direction: column; gap: 20px">
+          <div style="align-self: flex-start; padding: 8px 14px; border-radius: 999px; background: linear-gradient(140deg, rgba(255,255,255,0.18), rgba(255,255,255,0.05) 60%, rgba(255,255,255,0.1)); border: 1px solid rgba(255,255,255,0.28); backdrop-filter: blur(34px) saturate(170%); -webkit-backdrop-filter: blur(34px) saturate(170%); font-size: 13px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; color: #F3E6BD">Poster checker for small businesses</div>
+          <h1 style="margin: 0; font-size: 46px; line-height: 1.05; letter-spacing: -1.4px">Make yours the one <span style="font-family: 'Instrument Serif', serif; font-style: italic; font-weight: 400; color: #FD9BB7">they notice.</span></h1>
+          <p style="margin: 0; font-size: 18px; line-height: 1.55; color: #E6D6C8">Your poster is never alone on the wall. We show you what people look at first, and how to put your message there.</p>
+          <div style="display: flex; gap: 14px; flex-wrap: wrap"><a href="#try" style="padding: 16px 26px; border-radius: 999px; background: #FD9BB7; color: #120709; font-weight: 700">Analyse my poster</a><button type="button" class="btn-ghost js-example" style="font-size: 16px; padding: 16px 22px">See an example</button></div>
         </div>
       </div>
-      <h3>Score breakdown</h3>
-      <div id="bars"></div>
-      <h3>What's wrong</h3>
-      <ol id="problems"></ol>
-      <h3>How to fix it</h3>
-      <ol id="fixes"></ol>
+    </div>
+  </header>
+
+  <!-- ================= 2 · ADD YOUR POSTER ================= -->
+  <section id="try" class="section">
+    <div class="reveal center">
+      <div class="eyebrow">Try it now</div>
+      <h2 class="big">Add your poster <span class="serif">or photo.</span></h2>
+      <p class="muted" style="margin: 0; font-size: 18px; max-width: 560px">A poster, an Instagram post, or a photo of your shop window. We will show you what people see first.</p>
+    </div>
+
+    <div class="upload-card glass-soft reveal">
+      <div class="upload-left">
+        <div class="step"><span>1</span>Add your poster or photo</div>
+        <div class="dropzone" id="dropzone">
+          <div class="drop-icon glass" id="dropIcon">
+            <svg aria-hidden="true" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#FD9BB7" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"/><path d="M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+          </div>
+          <img id="dropPreview" class="drop-preview" alt="Your poster" hidden>
+          <div id="dropTitle" style="font-size: 20px; font-weight: 700">Drop your file here</div>
+          <div class="muted" style="font-size: 15px">or</div>
+          <div style="display: flex; gap: 12px; flex-wrap: wrap; justify-content: center">
+            <button type="button" class="btn-ghost" id="chooseBtn">Choose a file</button>
+            <button type="button" class="btn-ghost" id="cameraBtn">Take a photo</button>
+          </div>
+          <div style="font-size: 13px; color: var(--muted-2)">PNG or JPG · from your phone or laptop</div>
+          <input type="file" id="fileInput" accept="image/*" hidden>
+          <input type="file" id="cameraInput" accept="image/*" capture="environment" hidden>
+        </div>
+      </div>
+
+      <div class="upload-right">
+        <div class="step"><span>2</span>What should people notice first?</div>
+        <label for="goal" class="muted" style="font-size: 14px">Type it in your own words</label>
+        <input id="goal" class="goal-input" placeholder="e.g. 50% off, the event date">
+        <div class="chips">
+          <button type="button" class="chip">The offer</button>
+          <button type="button" class="chip">The date</button>
+          <button type="button" class="chip">The product</button>
+          <button type="button" class="chip">Our name</button>
+        </div>
+        <div class="step"><span>3</span>Get your results</div>
+        <button type="button" class="btn" id="checkBtn" disabled style="margin-top: auto; padding: 18px; font-size: 17px">Check my poster ↓</button>
+        <button type="button" class="btn-ghost js-example" style="justify-content: center">No poster? Try our example</button>
+      </div>
     </div>
   </section>
-</main>
 
-<script>
-/* ========= CONFIG: change these at integration ========= */
-const USE_FAKE = true;                          // set false once C's API is ready
-const API_URL  = "http://localhost:8000/analyse"; // C's endpoint
+  <!-- ================= 3 · RESULTS (filled in by app.js) ================= -->
+  <section id="results" class="section" aria-live="polite">
+    <div class="loading" id="loading"><div class="spinner"></div>Reading your poster…</div>
 
-// Max points per sub-score (must add up to 100, agree with A/B/C)
-const MAX = { focal_match: 25, focal_point: 15, legibility: 15, contrast: 15, clutter: 15, balance: 15 };
-const NAMES = {
-  focal_match: "Eye reaches your message", focal_point: "Clear focal point", legibility: "Readable on a phone",
-  contrast: "Contrast", clutter: "Breathing space", balance: "Balance & alignment"
-};
-const BANDS = [
-  { min: 85, label: "🟢 Ready to launch", sub: "People will notice and get the message", col: "var(--green)" },
-  { min: 65, label: "🟡 Almost there",    sub: "1–2 quick fixes needed",                 col: "var(--yellow)" },
-  { min: 40, label: "🟠 Needs work",      sub: "Your key message is getting lost",       col: "var(--orange)" },
-  { min: 0,  label: "🔴 Will be ignored", sub: "Major composition problems",             col: "var(--red)" }
-];
+    <div class="results" id="resultsBox">
+      <div class="res-head">
+        <div style="display: flex; flex-direction: column; gap: 8px">
+          <div class="eyebrow">Your results</div>
+          <h2 id="resTitle">Fix 2 things and you'll <span class="serif">get noticed.</span></h2>
+          <p class="muted" style="margin: 0; font-size: 17px">Your goal: people should notice <b id="resGoal" style="color: var(--text)">—</b> first.</p>
+        </div>
+        <div class="score-box glass">
+          <div class="ring" id="ring"><div class="ring-inner"><b id="total">0</b><span class="muted" style="font-size: 12px">/ 100</span></div></div>
+          <div style="display: flex; flex-direction: column; gap: 8px">
+            <span class="badge" id="bandBadge">—</span>
+            <span class="muted" id="potential" style="font-size: 14px"></span>
+          </div>
+        </div>
+      </div>
 
-/* ========= FAKE DATA (same format C will return) ========= */
-function fakeResult(objective) {
-  return {
-    objective: objective || "50% discount",
-    elements: [
-      { label: "logo",     box: [8, 5, 45, 18] },
-      { label: "photo",    box: [10, 28, 80, 40] },
-      { label: "headline", box: [12, 70, 76, 10] },
-      { label: "discount", box: [60, 84, 32, 10] }
-    ],
-    eye_path: [
-      { label: "logo", x: 30, y: 14 }, { label: "photo", x: 50, y: 48 },
-      { label: "headline", x: 50, y: 75 }, { label: "discount", x: 76, y: 89 }
-    ],
-    subscores: { focal_match: 5, focal_point: 8, legibility: 8, contrast: 10, clutter: 5, balance: 9 },
-    problems: [
-      "Your discount is the LAST thing people see. It's 4th in the eye path.",
-      "The logo is bigger and brighter than the offer, so it steals attention.",
-      "The discount text is too small to read when scrolling on a phone."
-    ],
-    fixes: [
-      "Make '50% OFF' the biggest element and move it to the top half.",
-      "Shrink the logo and move it to a corner.",
-      "Put the discount on a high-contrast block colour."
-    ]
-  };
-}
+      <div class="panel glass-soft">
+        <div style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px">
+          <h3>Where eyes go, and what to fix</h3>
+          <button type="button" class="btn-ghost mono" id="replayPath" style="font-size: 12px; letter-spacing: 1px">● REPLAY EYE PATH</button>
+        </div>
+        <div class="annot-wrap">
+          <div class="annot glass">
+            <div class="annot-img-box" id="annotBox">
+              <img id="annotImg" alt="Your poster with the predicted eye path">
+              <svg class="annot-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+                <polyline id="pathLine" fill="none" stroke="#640D14" stroke-opacity="0.75" stroke-width="1.5" vector-effect="non-scaling-stroke" points=""/>
+              </svg>
+              <div id="markers"></div>
+              <div class="gaze" id="gaze" hidden></div>
+            </div>
+          </div>
+          <div class="fix-list" id="fixList"></div>
+        </div>
+      </div>
 
-/* ========= Elements ========= */
-const $ = id => document.getElementById(id);
-let imageFile = null, lastResult = null, playing = false;
+      <div class="stats-row">
+        <div class="breakdown glass">
+          <h3 style="margin: 18px 0 4px">Score breakdown</h3>
+          <div class="bd-head"><span>Check</span><span>Score</span><span>What this means</span></div>
+          <div id="bdRows"></div>
+        </div>
+        <div class="hex-card glass">
+          <h3 style="align-self: flex-start">Your poster's stats</h3>
+          <p class="muted" style="margin: 0; align-self: flex-start; font-size: 14px">The bigger the shape, the stronger the poster.</p>
+          <div id="hex" style="padding: 30px 40px; width: 100%; display: flex; justify-content: center"></div>
+          <div class="legend" id="hexLegend"></div>
+        </div>
+      </div>
 
-/* ========= Upload ========= */
-$("drop").onclick = () => $("file").click();
-$("file").onchange = e => loadFile(e.target.files[0]);
-["dragover", "dragenter"].forEach(ev => $("drop").addEventListener(ev, e => { e.preventDefault(); $("drop").classList.add("over"); }));
-["dragleave", "drop"].forEach(ev => $("drop").addEventListener(ev, e => { e.preventDefault(); $("drop").classList.remove("over"); }));
-$("drop").addEventListener("drop", e => loadFile(e.dataTransfer.files[0]));
-$("objective").oninput = updateButton;
+      <div class="access-row">
+        <div class="cb-card glass-soft">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px">
+            <div><div class="eyebrow">Accessibility</div><h3 style="margin-top: 6px">Colour-blind check</h3></div>
+            <span class="badge" id="cbBadge" hidden></span>
+          </div>
+          <p class="muted" style="margin: 0; font-size: 14px; line-height: 1.5">About 1 in 12 men and 1 in 200 women are colour-blind. This is how your poster looks to them. Check your main message is still easy to spot.</p>
+          <div class="cb-grid" id="cbGrid"></div>
+        </div>
+        <div class="read-card glass-soft">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px">
+            <div><div class="eyebrow">Accessibility</div><h3 style="margin-top: 6px">Reading level</h3></div>
+            <span class="badge" id="readBadge">—</span>
+          </div>
+          <p class="muted" style="margin: 0; font-size: 14px; line-height: 1.5">How easy your words are to understand at a glance.</p>
+          <div class="read-scale"><div class="read-marker" id="readMarker" style="left: 0%"></div><div class="read-tag" id="readTag" style="left: 0%">—</div></div>
+          <div style="display: flex; justify-content: space-between; font-size: 12px; color: var(--muted)"><span>✓ Age 8</span><span>◆ Age 12</span><span>▲ Age 16</span><span>✕ University</span></div>
+          <div class="read-stats"><div><b id="rWords">–</b><span>words</span></div><div><b id="rSecs">–</b><span>to read</span></div><div><b id="rHard">–</b><span>hard words</span></div></div>
+          <div id="readTip" style="font-size: 14px; line-height: 1.5"></div>
+        </div>
+      </div>
+    </div>
+  </section>
 
-function loadFile(file) {
-  if (!file || !file.type.startsWith("image/")) return alert("Please upload an image.");
-  imageFile = file;
-  $("img").src = URL.createObjectURL(file);
-  $("stage").style.display = "block";
-  $("drop").innerHTML = `✅ <b>${file.name}</b><br><small>Click to change</small>`;
-  clearOverlay();
-  updateButton();
-}
-function updateButton() { $("analyse").disabled = !imageFile || !$("objective").value.trim(); }
+  <footer>
+    <span>Saccade · built at DURHACK 2026</span>
+    <span>No cameras, no personal data. Just your design.</span>
+  </footer>
+</div>
 
-/* ========= Analyse ========= */
-$("analyse").onclick = async () => {
-  const objective = $("objective").value.trim();
-  $("empty").style.display = "none"; $("results").style.display = "none"; $("loading").style.display = "block";
-  $("analyse").disabled = true; clearOverlay();
-  try {
-    let result;
-    if (USE_FAKE) {
-      await wait(1200);                         // pretend to think
-      result = fakeResult(objective);
-    } else {
-      const form = new FormData();
-      form.append("image", imageFile);
-      form.append("objective", objective);
-      const res = await fetch(API_URL, { method: "POST", body: form });
-      if (!res.ok) throw new Error("API error " + res.status);
-      result = await res.json();
-    }
-    lastResult = result;
-    $("loading").style.display = "none";
-    showResults(result);
-    drawBoxes(result);
-    await playEyePath(result);
-  } catch (err) {
-    console.error(err);
-    $("loading").style.display = "none"; $("empty").style.display = "block";
-    $("empty").textContent = "Something went wrong analysing that image. Try again.";
-  } finally { updateButton(); }
-};
-$("replay").onclick = () => lastResult && playEyePath(lastResult);
-
-/* ========= Overlay ========= */
-function clearOverlay() {
-  $("boxes").innerHTML = ""; $("markers").innerHTML = "";
-  $("pathline").setAttribute("points", ""); $("gaze").style.opacity = 0; $("replay").style.display = "none";
-}
-function isTarget(label, objective) {
-  const a = label.toLowerCase(), b = objective.toLowerCase();
-  return b.includes(a) || a.includes(b);
-}
-function drawBoxes(r) {
-  $("boxes").innerHTML = "";
-  r.elements.forEach(el => {
-    const [x, y, w, h] = el.box;
-    const d = document.createElement("div");
-    d.className = "box" + (isTarget(el.label, r.objective) ? " target" : "");
-    Object.assign(d.style, { left: x + "%", top: y + "%", width: w + "%", height: h + "%" });
-    d.innerHTML = `<span>${isTarget(el.label, r.objective) ? "🎯 " : ""}${el.label}</span>`;
-    $("boxes").appendChild(d);
-  });
-}
-async function playEyePath(r) {
-  if (playing) return; playing = true;
-  $("markers").innerHTML = ""; $("pathline").setAttribute("points", ""); $("replay").style.display = "none";
-  const g = $("gaze"); const pts = [];
-  g.style.transition = "none"; g.style.left = r.eye_path[0].x + "%"; g.style.top = r.eye_path[0].y + "%";
-  await wait(50); g.style.transition = ""; g.style.opacity = 1;
-
-  for (let i = 0; i < r.eye_path.length; i++) {
-    const p = r.eye_path[i];
-    g.style.left = p.x + "%"; g.style.top = p.y + "%";
-    await wait(i === 0 ? 300 : 750);
-    pts.push(`${p.x},${p.y}`); $("pathline").setAttribute("points", pts.join(" "));
-    const m = document.createElement("div");
-    m.className = "marker" + (isTarget(p.label || "", r.objective) ? " target" : "");
-    m.style.left = p.x + "%"; m.style.top = p.y + "%"; m.textContent = i + 1;
-    $("markers").appendChild(m); requestAnimationFrame(() => m.classList.add("show"));
-    await wait(450);
-  }
-  await wait(300); g.style.opacity = 0;
-  $("replay").style.display = "block"; playing = false;
-}
-
-/* ========= Score panel ========= */
-function showResults(r) {
-  const total = r.total ?? Object.values(r.subscores).reduce((a, b) => a + b, 0);
-  const band = BANDS.find(b => total >= b.min);
-  $("results").style.display = "block";
-  $("band").textContent = r.band ? `${band.label.split(" ")[0]} ${r.band}` : band.label;
-  $("bandSub").textContent = band.sub;
-  $("ring").style.setProperty("--col", band.col);
-  countUp(total, band);
-
-  $("bars").innerHTML = "";
-  Object.entries(r.subscores).forEach(([key, val]) => {
-    const max = MAX[key] || 10, pct = Math.round(val / max * 100);
-    const col = pct >= 75 ? "var(--green)" : pct >= 50 ? "var(--yellow)" : pct >= 30 ? "var(--orange)" : "var(--red)";
-    const div = document.createElement("div"); div.className = "bar";
-    div.innerHTML = `<div class="bar-top"><span>${NAMES[key] || key}</span><b>${val}/${max}</b></div>
-                     <div class="track"><div class="fill" style="background:${col}"></div></div>`;
-    $("bars").appendChild(div);
-    requestAnimationFrame(() => setTimeout(() => div.querySelector(".fill").style.width = pct + "%", 50));
-  });
-  $("problems").innerHTML = r.problems.map(p => `<li>${p}</li>`).join("");
-  $("fixes").innerHTML = r.fixes.map(f => `<li>${f}</li>`).join("");
-}
-function countUp(target) {
-  let n = 0; const step = Math.max(1, Math.round(target / 30));
-  const t = setInterval(() => {
-    n = Math.min(target, n + step);
-    $("total").textContent = n; $("ring").style.setProperty("--pct", n);
-    if (n >= target) clearInterval(t);
-  }, 30);
-}
-const wait = ms => new Promise(r => setTimeout(r, ms));
-</script>
+<script src="app.js"></script>
 </body>
+</html>
