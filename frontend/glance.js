@@ -6,10 +6,10 @@
    ========================================================= */
 
 const LOOK_MS = 3000;          // how long people look at the poster
-const CLICKS_PER_DOT = 5;      // more clicks = the tracker learns your eyes better
-const MIN_DWELL_MS = 200;      // total time on a part before it counts as "seen"
+const CLICKS_PER_DOT = 3;      // more clicks = the tracker learns your eyes better
+const MIN_DWELL_MS = 150;      // total time on a part before it counts as "seen"
 const SETTLE_MS = 300;         // ignore the first moment while the eyes land on the poster
-const NEAR_PCT = 8;            // a look just outside a box still counts if it's this close
+const NEAR_PCT = 20;           // a look outside every box goes to the nearest part if it's this close (webcams wobble a lot)
 const WEBGAZER_ASSETS = "https://cdn.jsdelivr.net/npm/webgazer@3.5.3/dist/mediapipe/face_mesh";
 
 const $ = (id) => document.getElementById(id);
@@ -116,9 +116,9 @@ async function accuracyCheck() {
   for (const [px, py] of spots) {
     dot.style.left = px + "%"; dot.style.top = py + "%";
     await wait(700);                                    // let the eyes land
-    checking = []; await wait(1200);
+    checking = []; await wait(1500);                    // longer, so slow webcams still collect enough readings
     const got = checking; checking = null;
-    if (got.length < 4) continue;
+    if (got.length < 3) continue;
     pts.push([px / 100 * innerWidth, med(got.map(g => g.x)), py / 100 * innerHeight, med(got.map(g => g.y))]);
   }
   box.innerHTML = "";
@@ -137,20 +137,22 @@ async function accuracyCheck() {
   finishCalib(err);
 }
 function finishCalib(err) {
-  // webcam trackers are typically 10-20% of the screen off; these bands match that
-  const quality = err == null ? "unknown" : err < 12 ? "good" : err < 20 ? "ok" : "poor";
-  $("calHead").textContent = quality === "good" ? "Tracking looks good ✓" : quality === "ok" ? "Tracking is okay" : "Tracking is shaky";
-  $("calCount").textContent = quality === "good" ? "Get ready…" : quality === "ok" ? "Good enough. Getting ready…" : "Try more light on your face and keeping your head still.";
-  if (quality === "poor") {
-    const box = $("dots");
-    const again = document.createElement("button"); again.className = "btn"; again.textContent = "Redo the dots";
-    const go = document.createElement("button"); go.className = "btn-ghost"; go.textContent = "Continue anyway";
-    const row = document.createElement("div"); row.className = "cal-actions"; row.append(again, go); box.appendChild(row);
-    again.onclick = () => { try { webgazer.clearData(); } catch (e) {} fix = { ax: 1, bx: 0, ay: 1, by: 0 }; calibrate(); };
-    go.onclick = () => { $("calib").classList.remove("on"); look(); };
-    return;
-  }
-  setTimeout(() => { $("calib").classList.remove("on"); look(); }, 900);
+  // bands chosen for ordinary laptop webcams (they are often 15-25% of the screen off)
+  const quality = err == null ? "unknown" : err < 15 ? "good" : err < 25 ? "ok" : "rough";
+  $("calHead").textContent = quality === "good" ? "Tracking looks good ✓" : quality === "ok" ? "Tracking is okay ✓" : quality === "rough" ? "Your camera is a bit blurry" : "Ready";
+  $("calCount").textContent = quality === "rough"
+    ? "That's fine. We'll still run the test, results will just be a bit rougher. More light on your face helps."
+    : "Get ready…";
+  const box = $("dots"); box.innerHTML = "";
+  const row = document.createElement("div"); row.className = "cal-actions";
+  const go = document.createElement("button"); go.className = "btn"; go.textContent = "Start the test →";
+  const again = document.createElement("button"); again.className = "btn-ghost"; again.textContent = "Redo the dots";
+  row.append(go, again); box.appendChild(row);
+  let started = false;
+  const start = () => { if (started) return; started = true; $("calib").classList.remove("on"); look(); };
+  go.onclick = start;
+  again.onclick = () => { started = true; try { webgazer.clearData(); } catch (e) {} fix = { ax: 1, bx: 0, ay: 1, by: 0 }; calibrate(); };
+  setTimeout(start, quality === "rough" ? 4000 : 1500);   // never blocks: starts by itself
 }
 
 /* ---------- step 3: the 3-second glance ---------- */
@@ -183,10 +185,11 @@ function analyse(rect) {
   const t0 = pts.length ? pts[0].t : 0;
   const live = pts.filter(p => p.t - t0 >= SETTLE_MS);
 
-  // 2) smooth the webcam jitter: running median of 7 samples
+  // 2) smooth the webcam jitter: median of everything within a quarter of a second either side
+  //    (time-based, so slow webcams with only ~8 readings a second are treated the same as fast ones)
   const med = (a) => a.slice().sort((m, n) => m - n)[a.length >> 1];
-  const smooth = live.map((p, i) => {
-    const win = live.slice(Math.max(0, i - 3), i + 4);
+  const smooth = live.map((p) => {
+    const win = live.filter(q => Math.abs(q.t - p.t) <= 250);
     return { x: med(win.map(q => q.x)), y: med(win.map(q => q.y)), t: p.t };
   });
 
@@ -206,7 +209,7 @@ function analyse(rect) {
   const times = {};
   smooth.forEach((p, i) => {
     const h = hit(p); if (!h) return;
-    const dt = i ? Math.min(120, p.t - smooth[i - 1].t) : 0;
+    const dt = i ? Math.min(200, p.t - smooth[i - 1].t) : 0;
     (times[h] = times[h] || []).push({ t: p.t, dt });
   });
   const dwellTotals = {};
