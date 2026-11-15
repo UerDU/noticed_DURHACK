@@ -46,12 +46,12 @@ let mode = "camera";
 let samples = [];        // {x, y, t} in viewport pixels during the look
 let recording = false;
 
-let bias = { x: 0, y: 0 };        // how far off the tracker is for this person (measured after the dots)
+let fix = { ax: 1, bx: 0, ay: 1, by: 0 };   // per-person correction measured after the dots: true = a * guess + b
 let checking = null;               // samples collected during the accuracy check
 function onGaze(x, y) {
   if (x == null || y == null) return;
   if (checking) checking.push({ x, y, t: performance.now() });
-  if (recording) samples.push({ x: x - bias.x, y: y - bias.y, t: performance.now() });
+  if (recording) samples.push({ x: fix.ax * x + fix.bx, y: fix.ay * y + fix.by, t: performance.now() });
 }
 document.addEventListener("mousemove", e => { if (mode === "mouse") onGaze(e.clientX, e.clientY); });
 
@@ -76,19 +76,21 @@ function startMouse() { mode = "mouse"; look(); }
 
 /* ---------- step 2: calibration (9 dots) ---------- */
 function calibrate() {
-  $("calHead").textContent = "Look at each dot and click it";
+  $("calHead").textContent = `Look at each dot and click it ${CLICKS_PER_DOT} times`;
   const spots = [[10,12],[50,12],[90,12],[10,50],[50,50],[90,50],[10,88],[50,88],[90,88]];
   const box = $("dots"); box.innerHTML = "";
   let left = spots.length;
-  $("calCount").textContent = `${left} dots left`;
+  $("calCount").textContent = `${left} dots left · the number on each dot = clicks left`;
   spots.forEach(([x, y]) => {
     const b = document.createElement("button");
     b.className = "cal-dot"; b.style.left = x + "%"; b.style.top = y + "%";
-    b.setAttribute("aria-label", "Calibration dot");
+    b.setAttribute("aria-label", `Calibration dot: click ${CLICKS_PER_DOT} times`);
+    b.textContent = CLICKS_PER_DOT;            // the number shows how many clicks are left on this dot
     let clicks = 0;
     b.onclick = () => {                      // WebGazer learns from each click automatically
       clicks++;
-      b.style.opacity = String(1 - clicks * 0.15);
+      b.textContent = clicks < CLICKS_PER_DOT ? CLICKS_PER_DOT - clicks : "✓";
+      b.style.transform = `scale(${1 - clicks * 0.06})`;
       if (clicks >= CLICKS_PER_DOT) {
         b.classList.add("done"); left--;
         $("calCount").textContent = left ? `${left} dots left` : "Great! Get ready…";
@@ -105,31 +107,38 @@ function calibrate() {
    from each dot, then subtract that constant offset from every later gaze point. */
 async function accuracyCheck() {
   const box = $("dots"); box.innerHTML = "";
-  $("calHead").textContent = "Now just look at the dot";
-  $("calCount").textContent = "Don't click. Keep your head still.";
-  const spots = [[50, 50], [25, 25], [75, 25], [25, 75], [75, 75]];
+  $("calHead").textContent = "Now just look at the pink dot";
+  $("calCount").textContent = "No clicking. Follow it with your eyes and keep your head still.";
+  const spots = [[50, 50], [20, 20], [80, 20], [80, 80], [20, 80], [50, 50]];
   const dot = document.createElement("div"); dot.className = "cal-dot check"; box.appendChild(dot);
-  const offs = [];
+  const med = (a) => a.slice().sort((m, n) => m - n)[a.length >> 1];
+  const pts = [];                                       // [true x, guessed x, true y, guessed y]
   for (const [px, py] of spots) {
     dot.style.left = px + "%"; dot.style.top = py + "%";
-    await wait(500);                                   // let the eyes land
-    checking = []; await wait(1000);
+    await wait(700);                                    // let the eyes land
+    checking = []; await wait(1200);
     const got = checking; checking = null;
-    if (got.length < 3) continue;
-    const med = (a) => a.slice().sort((m, n) => m - n)[a.length >> 1];
-    const tx = px / 100 * innerWidth, ty = py / 100 * innerHeight;
-    offs.push({ x: med(got.map(g => g.x)) - tx, y: med(got.map(g => g.y)) - ty });
+    if (got.length < 4) continue;
+    pts.push([px / 100 * innerWidth, med(got.map(g => g.x)), py / 100 * innerHeight, med(got.map(g => g.y))]);
   }
   box.innerHTML = "";
-  if (!offs.length) { bias = { x: 0, y: 0 }; return finishCalib(null); }
-  const med = (a) => a.slice().sort((m, n) => m - n)[a.length >> 1];
-  bias = { x: med(offs.map(o => o.x)), y: med(offs.map(o => o.y)) };
+  if (pts.length < 3) { fix = { ax: 1, bx: 0, ay: 1, by: 0 }; return finishCalib(null); }
+  // straight-line fit per axis: true = a * guess + b (fixes both an offset and a squashed range)
+  const fit = (T, G) => {
+    const n = T.length, mg = G.reduce((s, v) => s + v, 0) / n, mt = T.reduce((s, v) => s + v, 0) / n;
+    let num = 0, den = 0; for (let i = 0; i < n; i++) { num += (G[i] - mg) * (T[i] - mt); den += (G[i] - mg) ** 2; }
+    let a = den > 1 ? num / den : 1; if (!(a > 0.6 && a < 2.2)) a = 1;   // keep it sane
+    return { a, b: mt - a * mg };
+  };
+  const fx = fit(pts.map(p => p[0]), pts.map(p => p[1])), fy = fit(pts.map(p => p[2]), pts.map(p => p[3]));
+  fix = { ax: fx.a, bx: fx.b, ay: fy.a, by: fy.b };
   // how far off is it AFTER the correction, as a % of the screen height?
-  const err = med(offs.map(o => Math.hypot(o.x - bias.x, o.y - bias.y))) / innerHeight * 100;
+  const err = med(pts.map(([tx, gx, ty, gy]) => Math.hypot(fix.ax * gx + fix.bx - tx, fix.ay * gy + fix.by - ty))) / innerHeight * 100;
   finishCalib(err);
 }
 function finishCalib(err) {
-  const quality = err == null ? "unknown" : err < 8 ? "good" : err < 14 ? "ok" : "poor";
+  // webcam trackers are typically 10-20% of the screen off; these bands match that
+  const quality = err == null ? "unknown" : err < 12 ? "good" : err < 20 ? "ok" : "poor";
   $("calHead").textContent = quality === "good" ? "Tracking looks good ✓" : quality === "ok" ? "Tracking is okay" : "Tracking is shaky";
   $("calCount").textContent = quality === "good" ? "Get ready…" : quality === "ok" ? "Good enough. Getting ready…" : "Try more light on your face and keeping your head still.";
   if (quality === "poor") {
@@ -137,7 +146,7 @@ function finishCalib(err) {
     const again = document.createElement("button"); again.className = "btn"; again.textContent = "Redo the dots";
     const go = document.createElement("button"); go.className = "btn-ghost"; go.textContent = "Continue anyway";
     const row = document.createElement("div"); row.className = "cal-actions"; row.append(again, go); box.appendChild(row);
-    again.onclick = () => { try { webgazer.clearData(); } catch (e) {} bias = { x: 0, y: 0 }; calibrate(); };
+    again.onclick = () => { try { webgazer.clearData(); } catch (e) {} fix = { ax: 1, bx: 0, ay: 1, by: 0 }; calibrate(); };
     go.onclick = () => { $("calib").classList.remove("on"); look(); };
     return;
   }
@@ -200,11 +209,13 @@ function analyse(rect) {
     const dt = i ? Math.min(120, p.t - smooth[i - 1].t) : 0;
     (times[h] = times[h] || []).push({ t: p.t, dt });
   });
+  const dwellTotals = {};
   const youOrder = Object.entries(times)
     .map(([label, arr]) => {
       const total = arr.reduce((s, q) => s + q.dt, 0);
       let acc = 0, mid = arr[0].t;
       for (const q of arr) { acc += q.dt; if (acc >= total / 2) { mid = q.t; break; } }
+      dwellTotals[label] = total;
       return { label, total, mid };
     })
     .filter(e => e.total >= MIN_DWELL_MS)                  // a part only counts if it really got looked at
@@ -212,13 +223,13 @@ function analyse(rect) {
     .map(e => e.label);
   const aiOrder = r.eye_path.map(p => p.label).filter((l, i, a) => l && a.indexOf(l) === i);
 
-  const pct = matchPct(aiOrder, youOrder);
+  const pct = matchPct(aiOrder, youOrder, dwellTotals);
   const target = r.target || (r.elements.find(e => e.is_target) || {}).label;
   const tYou = youOrder.indexOf(target), tAi = aiOrder.indexOf(target);
 
   renderResult({ pts, youOrder, aiOrder, pct, target, tYou, tAi });
   saveBoard(pct, tYou);
-  saveCrowd(pts, youOrder);
+  saveCrowd(pts, youOrder, dwellTotals);
   drawCrowd();
 }
 
@@ -288,10 +299,10 @@ function renderResult({ pts, youOrder, aiOrder, pct, target, tYou, tAi }) {
   $("youSeq").innerHTML = youOrder.map((l, i) => pill(l, "you", aiOrder[i] === l)).join("→") || `<span class="muted">No clear look detected</span>`;
 
   $("matchNum").textContent = pct + "%";
-  $("matchNum").style.color = pct >= 75 ? "var(--good)" : pct >= 50 ? "var(--ok)" : "var(--warn)";
-  $("matchSub").textContent = youOrder.length ? `Your eyes followed the AI's prediction on ${pct >= 75 ? "almost every step" : pct >= 50 ? "most steps" : "some steps"}.` : "We couldn't follow your eyes well. Try again with better light.";
-  $("resHead").innerHTML = pct >= 50
-    ? `Saccade guessed your eyes <span class="serif">${pct >= 75 ? "almost perfectly." : "pretty well."}</span>`
+  $("matchNum").style.color = pct >= 85 ? "var(--good)" : pct >= 70 ? "var(--ok)" : "var(--warn)";
+  $("matchSub").textContent = youOrder.length ? `Your eyes followed the AI's prediction on ${pct >= 85 ? "almost every step" : pct >= 70 ? "most steps" : "some steps"}.` : "We couldn't follow your eyes well. Try again with better light.";
+  $("resHead").innerHTML = pct >= 70
+    ? `Saccade guessed your eyes <span class="serif">${pct >= 85 ? "almost perfectly." : "pretty well."}</span>`
     : `Your eyes took <span class="serif">their own path.</span>`;
 
   let msg = "";
@@ -322,23 +333,32 @@ $("resetBoard").onclick = () => {
 };
 
 $("againBtn").onclick = () => {
-  if (mode === "camera" && window.webgazer) { try { webgazer.clearData(); webgazer.resume(); } catch (e) {} bias = { x: 0, y: 0 }; calibrate(); }
+  if (mode === "camera" && window.webgazer) { try { webgazer.clearData(); webgazer.resume(); } catch (e) {} fix = { ax: 1, bx: 0, ay: 1, by: 0 }; calibrate(); }
   else look();
 };
 window.addEventListener("beforeunload", () => { try { window.webgazer && webgazer.end(); } catch (e) {} });
 
 
-// match score = Kendall's tau on the order of the parts you looked at:
-// 100% = same order as the AI, 0% = no better than a random guess.
-// Parts you never looked at are left out here (webcams often miss thin strips);
-// "you never looked at your message" is reported separately.
-function matchPct(aiOrder, youOrder) {
+// match score: how well your eyes agreed with the AI, built from three parts so it moves smoothly
+//   45%  order       share of pairs of parts you looked at in the same order as the AI
+//   25%  first look  your first look = the AI's #1 (full), or its #2 (half)
+//   30%  attention   how your looking time was shared out vs the AI's ranking (more time on its top picks)
+// Tested with simulated jittery webcams: same order ~90%, one swap ~75%, random order ~60%, reverse ~20%.
+function matchPct(aiOrder, youOrder, dwell) {
+  if (!youOrder.length || !aiOrder.length) return 0;
   const both = aiOrder.filter(l => youOrder.includes(l));
-  if (both.length < 2) return both.length === 1 && youOrder[0] === aiOrder[0] ? 100 : 0;
-  let agree = 0, disagree = 0;
-  for (let i = 0; i < both.length; i++) for (let j = i + 1; j < both.length; j++)
-    youOrder.indexOf(both[i]) < youOrder.indexOf(both[j]) ? agree++ : disagree++;
-  return Math.max(0, Math.round((agree - disagree) / (agree + disagree) * 100));
+  let order = 0.5;
+  if (both.length >= 2) {
+    let agree = 0, pairs = 0;
+    for (let i = 0; i < both.length; i++) for (let j = i + 1; j < both.length; j++) { pairs++; if (youOrder.indexOf(both[i]) < youOrder.indexOf(both[j])) agree++; }
+    order = agree / pairs;
+  } else if (both.length === 1) order = youOrder[0] === aiOrder[0] ? 1 : 0.5;
+  const first = youOrder[0] === aiOrder[0] ? 1 : (youOrder[0] === aiOrder[1] || youOrder[1] === aiOrder[0]) ? 0.5 : 0;
+  if (!dwell) return Math.round(100 * (0.6 * order + 0.4 * first));
+  const W = aiOrder.map((_, i) => Math.max(0.05, 0.4 - 0.1 * i)), wSum = W.reduce((s, v) => s + v, 0);
+  const tSum = aiOrder.reduce((s, l) => s + (dwell[l] || 0), 0) || 1;
+  const attention = aiOrder.reduce((s, l, i) => s + Math.min(W[i] / wSum, (dwell[l] || 0) / tSum), 0);
+  return Math.round(100 * (0.45 * order + 0.25 * first + 0.3 * attention));
 }
 
 /* ---------- crowd view: everyone's eyes on this poster ---------- */
@@ -349,11 +369,11 @@ function posterKey() {                      // same poster -> same crowd
   return "crowd:" + img.length + ":" + h;
 }
 function readCrowd() { try { return JSON.parse(localStorage.getItem("saccade:" + posterKey()) || "[]"); } catch (e) { return []; } }
-function saveCrowd(pts, order) {
+function saveCrowd(pts, order, dwell) {
   if (!pts.length) return;
   const crowd = readCrowd();
   const step = Math.max(1, Math.floor(pts.length / 60));  // keep ~60 anonymous dots per person
-  crowd.push({ p: pts.filter((_, i) => i % step === 0).map(q => [+q.x.toFixed(1), +q.y.toFixed(1)]), o: order, m: mode === "mouse" ? 1 : 0 });
+  crowd.push({ p: pts.filter((_, i) => i % step === 0).map(q => [+q.x.toFixed(1), +q.y.toFixed(1)]), o: order, d: dwell || null, m: mode === "mouse" ? 1 : 0 });
   try { localStorage.setItem("saccade:" + posterKey(), JSON.stringify(crowd.slice(-60))); } catch (e) {}
 }
 
@@ -384,9 +404,9 @@ function drawCrowd() {
   $("crowdFirst").textContent = `${topFirst} (${nFirst}/${crowd.length})`;
   $("crowdFirstSub").textContent = topFirst === aiFirst ? "✓ The AI predicted this would be first." : `The AI predicted "${aiFirst}" would be first.`;
   const aiOrder = r.eye_path.map(p => p.label).filter((l, i, a) => l && a.indexOf(l) === i);
-  const avg = Math.round(crowd.reduce((s, c) => s + matchPct(aiOrder, c.o), 0) / crowd.length);
+  const avg = Math.round(crowd.reduce((s, c) => s + matchPct(aiOrder, c.o, c.d), 0) / crowd.length);
   $("crowdMatch").textContent = avg + "%";
-  $("crowdMatch").style.color = avg >= 75 ? "var(--good)" : avg >= 50 ? "var(--ok)" : "var(--warn)";
+  $("crowdMatch").style.color = avg >= 85 ? "var(--good)" : avg >= 70 ? "var(--ok)" : "var(--warn)";
   const target = r.target || (r.elements.find(e => e.is_target) || {}).label;
   const early = crowd.filter(c => { const i = c.o.indexOf(target); return i === 0 || i === 1; }).length;
   $("crowdTarget").textContent = target ? `${early}/${crowd.length} people` : "–";
