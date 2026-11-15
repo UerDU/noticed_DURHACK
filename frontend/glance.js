@@ -132,15 +132,14 @@ function analyse(rect) {
   });
   const aiOrder = r.eye_path.map(p => p.label).filter((l, i, a) => l && a.indexOf(l) === i);
 
-  // match score: same position = full point, off by one = half point
-  let score = 0;
-  aiOrder.forEach((l, i) => { const j = youOrder.indexOf(l); if (j === i) score += 1; else if (j !== -1 && Math.abs(j - i) === 1) score += 0.5; });
-  const pct = aiOrder.length ? Math.round(score / aiOrder.length * 100) : 0;
+  const pct = matchPct(aiOrder, youOrder);
   const target = r.target || (r.elements.find(e => e.is_target) || {}).label;
   const tYou = youOrder.indexOf(target), tAi = aiOrder.indexOf(target);
 
   renderResult({ pts, youOrder, aiOrder, pct, target, tYou, tAi });
   saveBoard(pct, tYou);
+  saveCrowd(pts, youOrder);
+  drawCrowd();
 }
 
 function renderResult({ pts, youOrder, aiOrder, pct, target, tYou, tAi }) {
@@ -205,3 +204,114 @@ $("againBtn").onclick = () => {
   else look();
 };
 window.addEventListener("beforeunload", () => { try { window.webgazer && webgazer.end(); } catch (e) {} });
+
+
+// match score: same position = full point, off by one = half point
+function matchPct(aiOrder, youOrder) {
+  let score = 0;
+  aiOrder.forEach((l, i) => { const j = youOrder.indexOf(l); if (j === i) score += 1; else if (j !== -1 && Math.abs(j - i) === 1) score += 0.5; });
+  return aiOrder.length ? Math.round(score / aiOrder.length * 100) : 0;
+}
+
+/* ---------- crowd view: everyone's eyes on this poster ---------- */
+function posterKey() {                      // same poster -> same crowd
+  const img = String(data.image);
+  if (img.length < 200) return "crowd:" + img;
+  let h = 0; for (let i = 0; i < img.length; i += 97) h = (h * 31 + img.charCodeAt(i)) | 0;
+  return "crowd:" + img.length + ":" + h;
+}
+function readCrowd() { try { return JSON.parse(localStorage.getItem("saccade:" + posterKey()) || "[]"); } catch (e) { return []; } }
+function saveCrowd(pts, order) {
+  if (mode === "mouse" || !pts.length) return;             // only real eyes
+  const crowd = readCrowd();
+  const step = Math.max(1, Math.floor(pts.length / 60));  // keep ~60 anonymous dots per person
+  crowd.push({ p: pts.filter((_, i) => i % step === 0).map(q => [+q.x.toFixed(1), +q.y.toFixed(1)]), o: order });
+  try { localStorage.setItem("saccade:" + posterKey(), JSON.stringify(crowd.slice(-60))); } catch (e) {}
+}
+
+function drawCrowd() {
+  const crowd = readCrowd();
+  const r = data.result;
+  $("crowdN").textContent = crowd.length === 1 ? "1 person" : `${crowd.length} people`;
+  $("crowdImg").src = data.image;
+  $("crowdAiLine").setAttribute("points", r.eye_path.map(p => `${p.x},${p.y}`).join(" "));
+  $("crowdTags").innerHTML = r.eye_path.map((p, i) => `<div class="tag ai" style="left:${p.x}%;top:${p.y}%">0${i + 1}</div>`).join("");
+
+  // heatmap
+  const img = $("crowdImg");
+  const paint = () => {
+    const cv = $("crowdHeat");
+    const W = 300, H = Math.round(300 * (img.naturalHeight || 4) / (img.naturalWidth || 3));
+    cv.width = W; cv.height = H;
+    const grid = new Float32Array(W * H);
+    const rad = Math.round(W * 0.06), sig2 = 2 * (rad / 2) ** 2;
+    crowd.forEach(person => person.p.forEach(([x, y]) => {
+      const cx = Math.round(x / 100 * W), cy = Math.round(y / 100 * H);
+      for (let dy = -rad; dy <= rad; dy++) for (let dx = -rad; dx <= rad; dx++) {
+        const X = cx + dx, Y = cy + dy;
+        if (X >= 0 && X < W && Y >= 0 && Y < H) grid[Y * W + X] += Math.exp(-(dx * dx + dy * dy) / sig2);
+      }
+    }));
+    let mx = 0; for (const v of grid) mx = Math.max(mx, v);
+    const ctx = cv.getContext("2d"), out = ctx.createImageData(W, H);
+    for (let i = 0; i < grid.length; i++) {
+      const t = mx ? grid[i] / mx : 0;
+      // cherry -> cotton candy -> pearl, transparent where nobody looked
+      const stops = [[0, [173, 40, 49]], [0.4, [253, 155, 183]], [0.75, [255, 214, 120]], [1, [255, 248, 225]]];
+      let c = stops[0][1];
+      for (let k = 1; k < stops.length; k++) if (t <= stops[k][0]) { const [a0, ca] = stops[k - 1], [a1, cb] = stops[k], f = (t - a0) / (a1 - a0); c = ca.map((v, j) => v + (cb[j] - v) * f); break; }
+      out.data[i * 4] = c[0]; out.data[i * 4 + 1] = c[1]; out.data[i * 4 + 2] = c[2];
+      out.data[i * 4 + 3] = t < 0.05 ? 0 : Math.round(255 * Math.min(0.85, 0.25 + t));
+    }
+    ctx.putImageData(out, 0, 0);
+  };
+  if (img.complete && img.naturalWidth) paint(); else img.onload = paint;
+
+  // stats
+  if (!crowd.length) {
+    $("crowdFirst").textContent = "–"; $("crowdFirstSub").textContent = "Test a few people to fill this in.";
+    $("crowdTarget").textContent = "–"; $("crowdTargetSub").textContent = ""; $("crowdBars").innerHTML = ""; $("crowdMatch").textContent = "–"; return;
+  }
+  const firsts = {}; crowd.forEach(c => { const f = c.o[0] || "nothing clear"; firsts[f] = (firsts[f] || 0) + 1; });
+  const [topFirst, nFirst] = Object.entries(firsts).sort((a, b) => b[1] - a[1])[0];
+  const aiFirst = r.eye_path[0] && r.eye_path[0].label;
+  $("crowdFirst").textContent = `${topFirst} (${nFirst}/${crowd.length})`;
+  $("crowdFirstSub").textContent = topFirst === aiFirst ? "✓ The AI predicted this would be first." : `The AI predicted "${aiFirst}" would be first.`;
+  const aiOrder = r.eye_path.map(p => p.label).filter((l, i, a) => l && a.indexOf(l) === i);
+  const avg = Math.round(crowd.reduce((s, c) => s + matchPct(aiOrder, c.o), 0) / crowd.length);
+  $("crowdMatch").textContent = avg + "%";
+  $("crowdMatch").style.color = avg >= 75 ? "var(--good)" : avg >= 50 ? "var(--ok)" : "var(--warn)";
+  const target = r.target || (r.elements.find(e => e.is_target) || {}).label;
+  const early = crowd.filter(c => { const i = c.o.indexOf(target); return i === 0 || i === 1; }).length;
+  $("crowdTarget").textContent = target ? `${early}/${crowd.length} people` : "–";
+  $("crowdTargetSub").textContent = target ? `Your message: ★ ${target}` : "No message was marked for this poster.";
+  const labels = [...new Set(r.elements.map(e => e.label))];
+  $("crowdBars").innerHTML = labels.map(l => {
+    const n = crowd.filter(c => c.o.includes(l)).length, pctSeen = Math.round(n / crowd.length * 100);
+    return `<div><div style="display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 4px"><span>${l === target ? "★ " : ""}${l}</span><b>${n}/${crowd.length} saw it</b></div>
+      <div class="track"><div class="fill" style="width: ${pctSeen}%; background: ${l === target ? "var(--accent)" : "var(--pearl)"}"></div></div></div>`;
+  }).join("");
+}
+
+// save the crowd view as a picture for the slides
+$("saveCrowd").onclick = async () => {
+  const img = $("crowdImg"), heat = $("crowdHeat");
+  const W = 1200, ph = Math.round(700 * img.naturalHeight / img.naturalWidth), H = Math.max(ph + 120, 900);
+  const c = document.createElement("canvas"); c.width = W; c.height = H;
+  const ctx = c.getContext("2d");
+  ctx.fillStyle = "#120709"; ctx.fillRect(0, 0, W, H);
+  const pw = Math.round(700 * Math.min(1, (H - 140) / ph)), phh = Math.round(pw * img.naturalHeight / img.naturalWidth);
+  ctx.drawImage(img, 40, 100, pw, phh);
+  ctx.fillStyle = "rgba(18,7,9,0.55)"; ctx.fillRect(40, 100, pw, phh);
+  ctx.drawImage(heat, 40, 100, pw, phh);
+  ctx.strokeStyle = "#F3E6BD"; ctx.setLineDash([8, 6]); ctx.lineWidth = 2; ctx.beginPath();
+  data.result.eye_path.forEach((p, i) => { const x = 40 + p.x / 100 * pw, y = 100 + p.y / 100 * phh; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
+  ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle = "#F7EEDC"; ctx.font = "700 40px Inter, sans-serif"; ctx.fillText("Where " + $("crowdN").textContent + " actually looked", 40, 64);
+  ctx.font = "600 26px Inter, sans-serif";
+  const lines = [["Looked at first", $("crowdFirst").textContent], ["Saw the message early", $("crowdTarget").textContent], ["AI matched this crowd", $("crowdMatch").textContent]];
+  lines.forEach(([k, v], i) => { ctx.fillStyle = "#C2ACA2"; ctx.fillText(k, 40 + pw + 50, 160 + i * 110); ctx.fillStyle = "#FD9BB7"; ctx.font = "800 36px Inter, sans-serif"; ctx.fillText(v, 40 + pw + 50, 205 + i * 110); ctx.font = "600 26px Inter, sans-serif"; });
+  ctx.fillStyle = "#C2ACA2"; ctx.font = "500 20px Inter, sans-serif"; ctx.fillText("Saccade · Glance Test · dashed = AI prediction, glow = real eyes", 40, H - 24);
+  const a = document.createElement("a"); a.download = "saccade-crowd-heatmap.png"; a.href = c.toDataURL("image/png"); a.click();
+};
+drawCrowd();
