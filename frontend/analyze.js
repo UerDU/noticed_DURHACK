@@ -40,6 +40,103 @@ const SACCADE_LOCAL = (() => {
     return (v === "middle" && !h) ? "centre" : v + h;
   }
 
+  /* ---------- find the parts of a poster ----------
+     1. the background = the most common colour
+     2. anything clearly different from it (colour or edges) is "ink"
+     3. smear ink sideways so letters join into words and lines
+     4. each joined blob = one part; describe its size, contrast and whether it looks like text */
+  function findParts(img) {
+    const PW = 180, PH = Math.max(8, Math.round(PW * img.height / img.width)), M = PW * PH;
+    const c = document.createElement("canvas"); c.width = PW; c.height = PH;
+    const ctx = c.getContext("2d"); ctx.drawImage(img, 0, 0, PW, PH);
+    const d = ctx.getImageData(0, 0, PW, PH).data;
+    const R = new Float32Array(M), G = new Float32Array(M), B = new Float32Array(M), Lm = new Float32Array(M), Sat = new Float32Array(M);
+    const hist = new Map(); let bestK = 0, bestN = 0;
+    for (let i = 0; i < M; i++) {
+      R[i] = d[i * 4] / 255; G[i] = d[i * 4 + 1] / 255; B[i] = d[i * 4 + 2] / 255;
+      Lm[i] = 0.2126 * R[i] + 0.7152 * G[i] + 0.0722 * B[i];
+      const mx = Math.max(R[i], G[i], B[i]), mn = Math.min(R[i], G[i], B[i]); Sat[i] = mx ? (mx - mn) / mx : 0;
+      const k = (R[i] * 6 | 0) * 49 + (G[i] * 6 | 0) * 7 + (B[i] * 6 | 0);
+      const n = (hist.get(k) || 0) + 1; hist.set(k, n); if (n > bestN) { bestN = n; bestK = k; }
+    }
+    if (bestN / M < 0.18) return [];                       // no clear background (full photo)
+    let br = 0, bg = 0, bb = 0, bn = 0;
+    for (let i = 0; i < M; i++) if ((R[i] * 6 | 0) * 49 + (G[i] * 6 | 0) * 7 + (B[i] * 6 | 0) === bestK) { br += R[i]; bg += G[i]; bb += B[i]; bn++; }
+    br /= bn; bg /= bn; bb /= bn;
+    const bgL = 0.2126 * br + 0.7152 * bg + 0.0722 * bb;
+    const ink = new Uint8Array(M), cd = new Float32Array(M);
+    for (let y = 1; y < PH - 1; y++) for (let x = 1; x < PW - 1; x++) {
+      const i = y * PW + x;
+      cd[i] = Math.hypot(R[i] - br, G[i] - bg, B[i] - bb);
+      const e = Math.hypot(Lm[i + 1] - Lm[i - 1], Lm[i + PW] - Lm[i - PW]);
+      if (cd[i] > 0.16 || e > 0.22) ink[i] = 1;
+    }
+    // join letters: grow ink 3px sideways and 1px up/down
+    const grown = new Uint8Array(M);
+    for (let y = 0; y < PH; y++) for (let x = 0; x < PW; x++) {
+      if (!ink[y * PW + x]) continue;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -3; dx <= 3; dx++) {
+        const X = x + dx, Y = y + dy; if (X >= 0 && X < PW && Y >= 0 && Y < PH) grown[Y * PW + X] = 1;
+      }
+    }
+    // connected blobs
+    const lab = new Int32Array(M).fill(-1), blobs = [];
+    for (let i = 0; i < M; i++) {
+      if (!grown[i] || lab[i] !== -1) continue;
+      const id = blobs.length, st = [i]; lab[i] = id;
+      const b = { x0: PW, y0: PH, x1: 0, y1: 0, n: 0, inkN: 0, sx: 0, sy: 0, con: 0, sat: 0, edges: 0 };
+      while (st.length) {
+        const j = st.pop(), x = j % PW, y = (j / PW) | 0;
+        b.n++; if (x < b.x0) b.x0 = x; if (x > b.x1) b.x1 = x; if (y < b.y0) b.y0 = y; if (y > b.y1) b.y1 = y;
+        if (ink[j]) { b.inkN++; b.sx += x; b.sy += y; b.con += cd[j] + Math.abs(Lm[j] - bgL); b.sat += Sat[j]; }
+        if (x > 0 && x < PW - 1 && ink[j] !== ink[j - 1]) b.edges++;          // light/dark switches = letter strokes
+        for (const k of [j - 1, j + 1, j - PW, j + PW]) {
+          if (k < 0 || k >= M || lab[k] !== -1 || !grown[k]) continue;
+          if ((k === j - 1 && x === 0) || (k === j + 1 && x === PW - 1)) continue;
+          lab[k] = id; st.push(k);
+        }
+      }
+      blobs.push(b);
+    }
+    const parts = [];
+    blobs.forEach(b => {
+      const w = b.x1 - b.x0 + 1, h = b.y1 - b.y0 + 1, boxA = w * h;
+      if (b.inkN < M * 0.0012 || h < 2 || (h <= 2 && w > PW * 0.5)) return;   // specks and divider lines
+      if (boxA > M * 0.8) return;                                            // a frame around everything
+      const fill = b.inkN / boxA, strokes = b.edges / Math.max(1, h * w / PW * 4);
+      const text = w / h > 1.8 && fill > 0.12 && fill < 0.75 && b.edges / h > 6;
+      parts.push({
+        box: [b.x0 / PW * 100, b.y0 / PH * 100, w / PW * 100, h / PH * 100],
+        cx: b.sx / b.inkN / PW * 100, cy: b.sy / b.inkN / PH * 100,
+        area: boxA / M, contrast: Math.min(1, b.con / b.inkN), colour: b.sat / b.inkN,
+        text, big: h / PH > 0.045, strokes
+      });
+    });
+    // join words on the same line ("BLOOM" + "CAFÉ" = one title)
+    for (let changed = true; changed;) {
+      changed = false;
+      for (let i = 0; i < parts.length && !changed; i++) for (let j = i + 1; j < parts.length && !changed; j++) {
+        const a = parts[i], b = parts[j];
+        if (!a.text || !b.text) continue;
+        const [ax, ay, aw, ah] = a.box, [bx, by, bw, bh] = b.box;
+        const overlapY = Math.min(ay + ah, by + bh) - Math.max(ay, by);
+        const gapX = Math.max(bx - (ax + aw), ax - (bx + bw));
+        if (overlapY > 0.5 * Math.min(ah, bh) && gapX < 7 && Math.abs(ah - bh) < 0.5 * Math.max(ah, bh)) {
+          const x0 = Math.min(ax, bx), y0 = Math.min(ay, by), x1 = Math.max(ax + aw, bx + bw), y1 = Math.max(ay + ah, by + bh);
+          const wa = a.area, wb = b.area, t = wa + wb;
+          parts[i] = { box: [x0, y0, x1 - x0, y1 - y0], cx: (a.cx * wa + b.cx * wb) / t, cy: (a.cy * wa + b.cy * wb) / t,
+            area: (x1 - x0) * (y1 - y0) / 10000, contrast: (a.contrast * wa + b.contrast * wb) / t, colour: (a.colour * wa + b.colour * wb) / t,
+            text: true, big: a.big || b.big, strokes: a.strokes + b.strokes };
+          parts.splice(j, 1); changed = true;
+        }
+      }
+    }
+    // one giant part covering most of the poster = it's really a photo poster
+    if (parts.some(p => p.area > 0.65)) return [];
+    // keep the strongest 8 so the path stays readable
+    return parts.sort((a, b) => b.area * (0.4 + b.contrast) - a.area * (0.4 + a.contrast)).slice(0, 8);
+  }
+
   async function analyse(imageURL, objective, targetPt) {
     const img = new Image(); img.src = imageURL; await img.decode();
     const H = Math.max(8, Math.round(W * img.height / img.width));
@@ -86,38 +183,84 @@ const SACCADE_LOCAL = (() => {
     const salS = boxBlur(sal, W, H, CFG.blur); for (let i = 0; i < N; i++) sal[i] = salS[i];
     normalise(sal);
 
-    // 5) eye path: strongest spot, then "inhibition of return" so the eye moves on
-    const work = Float32Array.from(sal);
-    const R = Math.round(W * CFG.jump);
-    const peaks = [];
-    for (let s = 0; s < STOPS + 2; s++) {
-      let bi = 0; for (let i = 1; i < N; i++) if (work[i] > work[bi]) bi = i;
-      const px_ = bi % W, py_ = Math.floor(bi / W);
-      peaks.push({ x: px_ / W * 100, y: py_ / H * 100, v: work[bi] });
-      for (let y = Math.max(0, py_ - R); y < Math.min(H, py_ + R); y++)
-        for (let x = Math.max(0, px_ - R); x < Math.min(W, px_ + R); x++)
-          if ((x - px_) ** 2 + (y - py_) ** 2 < R * R) work[y * W + x] *= 0.08;
-    }
+    // 5) find the PARTS of the poster (text lines, images, shapes) instead of loose hot spots
+    const parts = findParts(img);
 
-    // 6) where is the message? (the tap, if given)
-    let targetRank = -1;
-    const near = (a, b) => Math.hypot(a.x - b.x, (a.y - b.y) * H / W) < 20;
-    if (targetPt) {
-      targetRank = peaks.findIndex(p => near(p, targetPt));
-      if (targetRank === -1) {
-        const tv = sal[Math.min(H - 1, Math.round(targetPt.y / 100 * H)) * W + Math.min(W - 1, Math.round(targetPt.x / 100 * W))];
-        targetRank = peaks.findIndex(p => tv > p.v);        // slot it in by strength
-        if (targetRank === -1) targetRank = peaks.length;
-        peaks.splice(targetRank, 0, { x: targetPt.x, y: targetPt.y, v: tv });
-      }
-    }
-    const path = peaks.slice(0, STOPS);
+    let path = [], elements = [], targetRank = -1;
     const msgLabel = (objective || "your message").trim().replace(/^(the|our|my|your|a|an)\s+/i, "").toLowerCase().slice(0, 24);
-    const eye_path = path.map((p, i) => ({ label: i === targetRank ? msgLabel : where(p.x, p.y), x: +p.x.toFixed(1), y: +p.y.toFixed(1) }));
-    // make labels unique
-    const seen = {}; eye_path.forEach(p => { if (seen[p.label]) p.label += " " + (++seen[p.label]); else seen[p.label] = 1; });
-    const elements = eye_path.map((p, i) => ({ label: p.label, box: [Math.max(0, p.x - 10), Math.max(0, p.y - 7), 20, 14], is_target: i === targetRank }));
-    if (targetPt && targetRank >= STOPS) elements.push({ label: msgLabel, box: [targetPt.x - 10, targetPt.y - 7, 20, 14], is_target: true });
+
+    if (parts.length >= 3) {
+      // how strongly each part pulls the eye: size, contrast, text, position, plus the saliency inside it
+      parts.forEach(pt => {
+        let sv = 0, n = 0;
+        for (let y = Math.floor(pt.box[1] / 100 * H); y < Math.ceil((pt.box[1] + pt.box[3]) / 100 * H); y++)
+          for (let x = Math.floor(pt.box[0] / 100 * W); x < Math.ceil((pt.box[0] + pt.box[2]) / 100 * W); x++)
+            if (x >= 0 && x < W && y >= 0 && y < H) { sv = Math.max(sv, sal[y * W + x]); n++; }
+        const top = 1.15 - 0.35 * (pt.cy / 100);                                  // higher up = seen earlier
+        const mid = 0.8 + 0.2 * Math.exp(-((pt.cx - 50) ** 2) / (2 * 30 * 30));   // a little centre bias
+        pt.pull = Math.sqrt(pt.area) * (0.4 + pt.contrast) * (pt.text ? (pt.big ? 1.45 : 0.75) : 1) * (0.85 + 0.3 * pt.colour) * top * mid * (0.6 + 0.4 * sv);
+      });
+      // eye path: strongest first, then short jumps are preferred (eyes move to nearby things)
+      const left = [...parts], order = [];
+      let cur = null;
+      while (left.length) {
+        let bi = 0, bs = -1;
+        left.forEach((pt, i) => {
+          const d = cur ? Math.hypot(pt.cx - cur.cx, (pt.cy - cur.cy) * H / W) / 100 : 0;
+          const sc = pt.pull * (1 - 0.4 * Math.min(1, d));
+          if (sc > bs) { bs = sc; bi = i; }
+        });
+        cur = left.splice(bi, 1)[0]; order.push(cur);
+      }
+      // name the parts
+      const bigText = order.filter(p => p.text && p.big).sort((a, b) => b.box[3] - a.box[3]);   // biggest letters = title
+      order.forEach(p => {
+        p.label = p.text ? (p === bigText[0] ? "title" : p.big ? "headline" : "small print")
+                : p.area > 0.06 ? (p.colour > 0.35 ? "picture" : "image") : "shape";
+      });
+      // the tapped message
+      if (targetPt) {
+        const dist = (p) => Math.hypot(Math.max(p.box[0] - targetPt.x, 0, targetPt.x - p.box[0] - p.box[2]), Math.max(p.box[1] - targetPt.y, 0, targetPt.y - p.box[1] - p.box[3]));
+        const inside = order.filter(p => dist(p) === 0).sort((a, b) => a.area - b.area)[0];
+        const tgt = inside || [...order].sort((a, b) => dist(a) - dist(b))[0];
+        if (tgt && dist(tgt) < 8) { targetRank = order.indexOf(tgt); tgt.label = msgLabel; }
+      }
+      const seen = {}; order.forEach(p => { if (seen[p.label]) p.label += " " + (++seen[p.label]); else seen[p.label] = 1; });
+      elements = order.map((p, i) => ({ label: p.label, box: p.box.map(v => +v.toFixed(1)), is_target: i === targetRank }));
+      path = order.slice(0, STOPS).map(p => ({ x: p.cx, y: p.cy, v: p.pull, label: p.label }));
+      if (targetPt && targetRank === -1) {                   // tapped somewhere with nothing there
+        elements.push({ label: msgLabel, box: [targetPt.x - 10, targetPt.y - 7, 20, 14], is_target: true });
+        targetRank = order.length;
+      }
+    } else {
+      // full-bleed photo (no clear parts): fall back to saliency hot spots
+      const work = Float32Array.from(sal), R = Math.round(W * CFG.jump), peaks = [];
+      const edge = Math.max(2, Math.round(W * 0.04));          // ignore the very edge of the picture
+      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++)
+        if (x < edge || y < edge || x >= W - edge || y >= H - edge) work[y * W + x] *= 0.3;
+      for (let s = 0; s < STOPS + 2; s++) {
+        let bi = 0; for (let i = 1; i < N; i++) if (work[i] > work[bi]) bi = i;
+        const px_ = bi % W, py_ = Math.floor(bi / W);
+        peaks.push({ x: px_ / W * 100, y: py_ / H * 100, v: work[bi] });
+        for (let y = Math.max(0, py_ - R); y < Math.min(H, py_ + R); y++)
+          for (let x = Math.max(0, px_ - R); x < Math.min(W, px_ + R); x++)
+            if ((x - px_) ** 2 + (y - py_) ** 2 < R * R) work[y * W + x] *= 0.08;
+      }
+      const near = (a, b) => Math.hypot(a.x - b.x, (a.y - b.y) * H / W) < 20;
+      if (targetPt) {
+        targetRank = peaks.findIndex(p => near(p, targetPt));
+        if (targetRank === -1) {
+          const tv = sal[Math.min(H - 1, Math.round(targetPt.y / 100 * H)) * W + Math.min(W - 1, Math.round(targetPt.x / 100 * W))];
+          targetRank = peaks.findIndex(p => tv > p.v); if (targetRank === -1) targetRank = peaks.length;
+          peaks.splice(targetRank, 0, { x: targetPt.x, y: targetPt.y, v: tv });
+        }
+      }
+      path = peaks.slice(0, STOPS).map((p, i) => ({ ...p, label: i === targetRank ? msgLabel : where(p.x, p.y) }));
+      const seen = {}; path.forEach(p => { if (seen[p.label]) p.label += " " + (++seen[p.label]); else seen[p.label] = 1; });
+      elements = path.map((p, i) => ({ label: p.label, box: [Math.max(0, p.x - 10), Math.max(0, p.y - 7), 20, 14], is_target: i === targetRank }));
+      if (targetPt && targetRank >= STOPS) elements.push({ label: msgLabel, box: [targetPt.x - 10, targetPt.y - 7, 20, 14], is_target: true });
+    }
+    const eye_path = path.map(p => ({ label: p.label, x: +p.x.toFixed(1), y: +p.y.toFixed(1) }));
 
     // 7) scores (same rubric and max points as the backend)
     let mean = 0; for (const v of L) mean += v; mean /= N;
