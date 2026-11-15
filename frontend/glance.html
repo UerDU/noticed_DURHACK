@@ -23,6 +23,8 @@
   #calib.on { display: block; }
   .cal-dot { position: absolute; width: 34px; height: 34px; margin: -17px 0 0 -17px; border-radius: 50%; border: 0; cursor: pointer;
     background: radial-gradient(circle, var(--accent) 0 35%, rgba(var(--accent-rgb),0.3) 36% 100%); box-shadow: 0 0 24px rgba(var(--accent-rgb),0.8); }
+  .cal-dot.check { pointer-events: none; transition: left .35s ease, top .35s ease; background: var(--accent); box-shadow: 0 0 0 8px rgba(253,155,183,0.25), 0 0 24px rgba(253,155,183,0.9); }
+  .cal-actions { position: absolute; left: 50%; top: 60%; transform: translateX(-50%); display: flex; gap: 12px; }
   .cal-dot.done { background: var(--good); box-shadow: 0 0 18px rgba(48,209,88,0.8); pointer-events: none; }
   .cal-msg { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); text-align: center; max-width: 480px; pointer-events: none; }
 
@@ -80,7 +82,7 @@
         <p class="muted" style="font-size: 18px; max-width: 680px; margin: 0">You'll look at a poster for <b style="color: var(--text)">3 seconds</b>. Your webcam roughly follows your eyes, and then we compare your real eye path with the AI's prediction.</p>
         <div class="gt-steps">
           <div class="gt-step glass"><span class="gt-num">1</span><b>Allow the camera</b><span class="muted" style="font-size: 14px">It stays in this browser. Nothing is saved or sent anywhere.</span></div>
-          <div class="gt-step glass"><span class="gt-num">2</span><b>Click 9 dots</b><span class="muted" style="font-size: 14px">Look at each dot and click it. This teaches the tracker your eyes (about 20 s).</span></div>
+          <div class="gt-step glass"><span class="gt-num">2</span><b>Click 9 dots</b><span class="muted" style="font-size: 14px">Look at each dot and click it 5 times, then just look at a moving dot. This teaches the tracker your eyes (about 40 s).</span></div>
           <div class="gt-step glass"><span class="gt-num">3</span><b>Glance for 3 seconds</b><span class="muted" style="font-size: 14px">Look at the poster naturally, like you're walking past it.</span></div>
         </div>
         <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center">
@@ -192,7 +194,7 @@
 <div id="calib" aria-live="polite">
   <div class="cal-msg">
     <div class="eyebrow">Step 2 of 3</div>
-    <h2 style="margin: 8px 0">Look at each dot and click it</h2>
+    <h2 style="margin: 8px 0" id="calHead">Look at each dot and click it</h2>
     <p class="muted" id="calCount">9 dots left</p>
   </div>
   <div id="dots"></div>
@@ -202,6 +204,6 @@
 <div id="look"><div class="count" id="countTxt">Look at the poster</div><img id="lookImg" alt="Poster to look at"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/webgazer@3.5.3/dist/webgazer.js"></script>
-<script src="glance.js?v=6"></script>
+<script src="glance.js?v=7"></script>
 </body>
 </html>

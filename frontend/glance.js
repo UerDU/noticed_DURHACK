@@ -6,6 +6,7 @@
    ========================================================= */
 
 const LOOK_MS = 3000;          // how long people look at the poster
+const CLICKS_PER_DOT = 5;      // more clicks = the tracker learns your eyes better
 const MIN_DWELL_MS = 200;      // total time on a part before it counts as "seen"
 const SETTLE_MS = 300;         // ignore the first moment while the eyes land on the poster
 const NEAR_PCT = 8;            // a look just outside a box still counts if it's this close
@@ -45,8 +46,12 @@ let mode = "camera";
 let samples = [];        // {x, y, t} in viewport pixels during the look
 let recording = false;
 
+let bias = { x: 0, y: 0 };        // how far off the tracker is for this person (measured after the dots)
+let checking = null;               // samples collected during the accuracy check
 function onGaze(x, y) {
-  if (recording && x != null && y != null) samples.push({ x, y, t: performance.now() });
+  if (x == null || y == null) return;
+  if (checking) checking.push({ x, y, t: performance.now() });
+  if (recording) samples.push({ x: x - bias.x, y: y - bias.y, t: performance.now() });
 }
 document.addEventListener("mousemove", e => { if (mode === "mouse") onGaze(e.clientX, e.clientY); });
 
@@ -71,6 +76,7 @@ function startMouse() { mode = "mouse"; look(); }
 
 /* ---------- step 2: calibration (9 dots) ---------- */
 function calibrate() {
+  $("calHead").textContent = "Look at each dot and click it";
   const spots = [[10,12],[50,12],[90,12],[10,50],[50,50],[90,50],[10,88],[50,88],[90,88]];
   const box = $("dots"); box.innerHTML = "";
   let left = spots.length;
@@ -82,16 +88,60 @@ function calibrate() {
     let clicks = 0;
     b.onclick = () => {                      // WebGazer learns from each click automatically
       clicks++;
-      b.style.opacity = String(1 - clicks * 0.25);
-      if (clicks >= 3) {
+      b.style.opacity = String(1 - clicks * 0.15);
+      if (clicks >= CLICKS_PER_DOT) {
         b.classList.add("done"); left--;
         $("calCount").textContent = left ? `${left} dots left` : "Great! Get ready…";
-        if (!left) setTimeout(() => { $("calib").classList.remove("on"); look(); }, 700);
+        if (!left) setTimeout(accuracyCheck, 600);
       }
     };
     box.appendChild(b);
   });
   $("calib").classList.add("on");
+}
+
+/* ---------- step 2b: accuracy check (like real eye-tracking labs do) ----------
+   The person just LOOKS at 5 dots (no clicking). We measure how far the tracker's guess is
+   from each dot, then subtract that constant offset from every later gaze point. */
+async function accuracyCheck() {
+  const box = $("dots"); box.innerHTML = "";
+  $("calHead").textContent = "Now just look at the dot";
+  $("calCount").textContent = "Don't click. Keep your head still.";
+  const spots = [[50, 50], [25, 25], [75, 25], [25, 75], [75, 75]];
+  const dot = document.createElement("div"); dot.className = "cal-dot check"; box.appendChild(dot);
+  const offs = [];
+  for (const [px, py] of spots) {
+    dot.style.left = px + "%"; dot.style.top = py + "%";
+    await wait(500);                                   // let the eyes land
+    checking = []; await wait(1000);
+    const got = checking; checking = null;
+    if (got.length < 3) continue;
+    const med = (a) => a.slice().sort((m, n) => m - n)[a.length >> 1];
+    const tx = px / 100 * innerWidth, ty = py / 100 * innerHeight;
+    offs.push({ x: med(got.map(g => g.x)) - tx, y: med(got.map(g => g.y)) - ty });
+  }
+  box.innerHTML = "";
+  if (!offs.length) { bias = { x: 0, y: 0 }; return finishCalib(null); }
+  const med = (a) => a.slice().sort((m, n) => m - n)[a.length >> 1];
+  bias = { x: med(offs.map(o => o.x)), y: med(offs.map(o => o.y)) };
+  // how far off is it AFTER the correction, as a % of the screen height?
+  const err = med(offs.map(o => Math.hypot(o.x - bias.x, o.y - bias.y))) / innerHeight * 100;
+  finishCalib(err);
+}
+function finishCalib(err) {
+  const quality = err == null ? "unknown" : err < 8 ? "good" : err < 14 ? "ok" : "poor";
+  $("calHead").textContent = quality === "good" ? "Tracking looks good ✓" : quality === "ok" ? "Tracking is okay" : "Tracking is shaky";
+  $("calCount").textContent = quality === "good" ? "Get ready…" : quality === "ok" ? "Good enough. Getting ready…" : "Try more light on your face and keeping your head still.";
+  if (quality === "poor") {
+    const box = $("dots");
+    const again = document.createElement("button"); again.className = "btn"; again.textContent = "Redo the dots";
+    const go = document.createElement("button"); go.className = "btn-ghost"; go.textContent = "Continue anyway";
+    const row = document.createElement("div"); row.className = "cal-actions"; row.append(again, go); box.appendChild(row);
+    again.onclick = () => { try { webgazer.clearData(); } catch (e) {} bias = { x: 0, y: 0 }; calibrate(); };
+    go.onclick = () => { $("calib").classList.remove("on"); look(); };
+    return;
+  }
+  setTimeout(() => { $("calib").classList.remove("on"); look(); }, 900);
 }
 
 /* ---------- step 3: the 3-second glance ---------- */
@@ -272,7 +322,7 @@ $("resetBoard").onclick = () => {
 };
 
 $("againBtn").onclick = () => {
-  if (mode === "camera" && window.webgazer) { try { webgazer.clearData(); webgazer.resume(); } catch (e) {} calibrate(); }
+  if (mode === "camera" && window.webgazer) { try { webgazer.clearData(); webgazer.resume(); } catch (e) {} bias = { x: 0, y: 0 }; calibrate(); }
   else look();
 };
 window.addEventListener("beforeunload", () => { try { window.webgazer && webgazer.end(); } catch (e) {} });
