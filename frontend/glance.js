@@ -186,7 +186,6 @@ function renderResult({ pts, youOrder, aiOrder, pct, target, tYou, tAi }) {
 /* ---------- scoreboard across everyone (this laptop only) ---------- */
 function readBoard() { try { return JSON.parse(localStorage.getItem("saccade:board") || "[]"); } catch (e) { return []; } }
 function saveBoard(pct, tYou) {
-  if (mode === "mouse") { drawBoard(readBoard()); return; }     // only count real eyes
   const b = readBoard(); b.push({ pct, early: tYou >= 0 && tYou <= 1 });
   try { localStorage.setItem("saccade:board", JSON.stringify(b)); } catch (e) {}
   drawBoard(b);
@@ -197,7 +196,10 @@ function drawBoard(b) {
   $("bTarget").textContent = b.length ? `${b.filter(x => x.early).length}/${b.length}` : "–";
 }
 drawBoard(readBoard());
-$("resetBoard").onclick = () => { try { localStorage.removeItem("saccade:board"); } catch (e) {} drawBoard([]); };
+$("resetBoard").onclick = () => {
+  try { localStorage.removeItem("saccade:board"); localStorage.removeItem("saccade:" + posterKey()); } catch (e) {}
+  drawBoard([]); drawCrowd();
+};
 
 $("againBtn").onclick = () => {
   if (mode === "camera" && window.webgazer) { try { webgazer.clearData(); webgazer.resume(); } catch (e) {} calibrate(); }
@@ -222,17 +224,20 @@ function posterKey() {                      // same poster -> same crowd
 }
 function readCrowd() { try { return JSON.parse(localStorage.getItem("saccade:" + posterKey()) || "[]"); } catch (e) { return []; } }
 function saveCrowd(pts, order) {
-  if (mode === "mouse" || !pts.length) return;             // only real eyes
+  if (!pts.length) return;
   const crowd = readCrowd();
   const step = Math.max(1, Math.floor(pts.length / 60));  // keep ~60 anonymous dots per person
-  crowd.push({ p: pts.filter((_, i) => i % step === 0).map(q => [+q.x.toFixed(1), +q.y.toFixed(1)]), o: order });
+  crowd.push({ p: pts.filter((_, i) => i % step === 0).map(q => [+q.x.toFixed(1), +q.y.toFixed(1)]), o: order, m: mode === "mouse" ? 1 : 0 });
   try { localStorage.setItem("saccade:" + posterKey(), JSON.stringify(crowd.slice(-60))); } catch (e) {}
 }
 
 function drawCrowd() {
   const crowd = readCrowd();
   const r = data.result;
-  $("crowdN").textContent = crowd.length === 1 ? "1 person" : `${crowd.length} people`;
+  const nMouse = crowd.filter(c => c.m).length;
+  $("crowdN").textContent = (crowd.length === 1 ? "1 person" : `${crowd.length} people`);
+  $("crowdMouse").textContent = nMouse ? `${nMouse} of ${crowd.length} used the mouse, not their eyes. Use the camera for real results.` : "";
+  $("crowdEmpty").hidden = crowd.length > 0;
   $("crowdImg").src = data.image;
   $("crowdAiLine").setAttribute("points", r.eye_path.map(p => `${p.x},${p.y}`).join(" "));
   $("crowdTags").innerHTML = r.eye_path.map((p, i) => `<div class="tag ai" style="left:${p.x}%;top:${p.y}%">0${i + 1}</div>`).join("");

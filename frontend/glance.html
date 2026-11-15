@@ -146,6 +146,7 @@
                 <polyline id="crowdAiLine" fill="none" stroke="#F3E6BD" stroke-width="1.5" stroke-dasharray="4 3" vector-effect="non-scaling-stroke" points=""/>
               </svg>
               <div id="crowdTags"></div>
+              <div id="crowdEmpty" style="position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 24px; font-weight: 700; font-size: 18px; color: #F3E6BD; background: rgba(18,7,9,0.45)">No heatmap yet.<br>Test a few people and their looks will glow here.</div>
             </div>
           </div>
           <div class="cmp-side">
@@ -168,6 +169,7 @@
               <div class="eyebrow">How each part was seen</div>
               <div id="crowdBars" style="display: flex; flex-direction: column; gap: 10px; margin-top: 10px"></div>
             </div>
+            <p class="note" id="crowdMouse" style="margin: 0; color: var(--ok)"></p>
             <p class="note" style="margin: 0">Bright = where many people looked. Dashed squares = the AI's prediction. Only anonymous dot positions are kept, on this laptop only. No video or faces.</p>
           </div>
         </div>
