@@ -109,6 +109,8 @@ document.querySelectorAll(".chip").forEach(chip => chip.onclick = () => {
   updateButton();
 });
 $("goal").oninput = updateButton;
+// coming back from the "Not sure what to say?" page: fill in the message for them
+if (params.get("notice")) { $("goal").value = params.get("notice"); }
 function updateButton() { $("checkBtn").disabled = !(imageFile && $("goal").value.trim()); }
 
 // "See an example" / "Try our example": loads the sample poster

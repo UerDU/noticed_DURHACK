@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Not sure what to say? · Saccade</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+  /* Cherry Velvet, same as the rest of Saccade */
+  :root {
+    --bg: #120709; --bg-2: #2A0F14;
+    --ink: #F7EEDC; --muted: #C2ACA2; --label: #F3E6BD;
+    --line: rgba(255,255,255,0.16);
+    --accent: #FD9BB7; --hi: #D8973C;
+    --glass: linear-gradient(140deg, rgba(255,255,255,0.16), rgba(255,255,255,0.05) 60%, rgba(255,255,255,0.1));
+    --serif: 'Instrument Serif', Georgia, serif; --mono: 'JetBrains Mono', ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; color: var(--ink); line-height: 1.5;
+    font-family: Inter, system-ui, sans-serif;
+    background: radial-gradient(900px 600px at 85% -10%, rgba(173,40,49,0.45), transparent 60%),
+                radial-gradient(700px 500px at -10% 40%, rgba(110,30,59,0.4), transparent 60%), var(--bg);
+    background-attachment: fixed;
+  }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 32px 16px 72px; }
+  header h1 { font-size: clamp(32px, 5vw, 46px); line-height: 1.1; margin: 0 0 8px; letter-spacing: -1px; }
+  header h1 em { font-family: var(--serif); font-weight: 400; color: var(--accent); }
+  header p { margin: 0 0 20px; color: var(--muted); font-size: 17px; }
+  .back { display: inline-block; margin-bottom: 18px; color: var(--muted); text-decoration: none; font-family: var(--mono); font-size: 12px; letter-spacing: 1px; text-transform: uppercase; }
+  .back:hover { color: var(--ink); }
+  .progress { height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden; margin-bottom: 18px; }
+  .progress > span { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #AD2831, var(--accent)); transition: width 0.4s ease; }
+
+  #log { display: flex; flex-direction: column; gap: 10px; }
+  .msg { max-width: 86%; padding: 11px 15px; border-radius: 18px; white-space: pre-wrap; }
+  .msg.bot { background: var(--glass); border: 1px solid var(--line); border-top-left-radius: 6px; align-self: flex-start; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+  .msg.me { background: var(--accent); color: var(--bg); font-weight: 600; border-top-right-radius: 6px; align-self: flex-end; }
+  .typing { color: var(--muted); font-style: italic; }
+
+  #composer { margin-top: 16px; display: flex; flex-direction: column; gap: 10px; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip {
+    font: inherit; padding: 8px 16px; border-radius: 999px; cursor: pointer;
+    border: 1.5px solid rgba(253,155,183,0.6); background: rgba(253,155,183,0.08); color: var(--accent); font-weight: 600;
+  }
+  .chip:hover { background: rgba(253,155,183,0.18); }
+  .chip.on { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+  .chip.soft { border-color: var(--line); color: var(--ink); font-weight: 500; background: rgba(255,255,255,0.05); }
+  .field { display: flex; gap: 8px; }
+  .field input {
+    flex: 1; font: inherit; padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; background: rgba(255,255,255,0.07); color: var(--ink);
+  }
+  .field input::placeholder { color: var(--muted); }
+  button.primary {
+    font: inherit; font-weight: 700; border: 0; border-radius: 999px; padding: 11px 20px;
+    background: var(--accent); color: var(--bg); cursor: pointer;
+  }
+  button.primary:disabled { opacity: 0.4; cursor: not-allowed; }
+  .hint { font-size: 0.88rem; color: var(--muted); }
+  :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+  /* the brief */
+  .brief { background: var(--glass); border: 1px solid rgba(255,255,255,0.22); border-radius: 26px; padding: 26px; margin-top: 8px; backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); }
+  .brief h2 { margin: 0 0 4px; font-size: 1.6rem; letter-spacing: -0.5px; }
+  .brief h3 { margin: 24px 0 8px; font-family: var(--mono); font-size: 0.74rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--label); }
+  .core { font-size: 1.5rem; font-weight: 700; line-height: 1.25; letter-spacing: -0.01em; }
+  .core mark { background: var(--accent); color: var(--bg); padding: 0 6px; border-radius: 4px; }
+  .swatches { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+  .sw { width: 86px; height: 54px; border-radius: 10px; display: flex; align-items: flex-end; padding: 4px 6px; font-family: var(--mono); font-size: 0.68rem; border: 1px solid rgba(255,255,255,0.2); }
+  .ideas { display: grid; gap: 10px; }
+  .idea { border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; background: rgba(255,255,255,0.04); }
+  .idea b { display: block; }
+  .tag { display: inline-block; font-size: 0.7rem; font-weight: 700; padding: 1px 9px; border-radius: 999px; background: var(--hi); color: var(--bg); margin-left: 6px; vertical-align: 1px; }
+  .tag.later { background: rgba(255,255,255,0.12); color: var(--muted); }
+  .notice { font-size: 0.9rem; color: var(--muted); margin-top: 4px; }
+  .brief ul { margin: 0; padding-left: 20px; }
+  .brief li { margin-bottom: 4px; }
+  .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 26px; }
+  a.primary { text-decoration: none; display: inline-block; font-weight: 700; border-radius: 999px; padding: 12px 20px; background: var(--accent); color: var(--bg); }
+  button.secondary { font: inherit; font-weight: 600; padding: 11px 18px; border-radius: 999px; border: 1px solid var(--line); background: rgba(255,255,255,0.06); color: var(--ink); cursor: pointer; }
+  button.secondary:hover { background: rgba(255,255,255,0.12); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="./#try">← Back to the poster checker</a>
+  <header>
+    <h1>Not sure what <em>to say?</em></h1>
+    <p>Answer a few quick questions and we'll work out your message, your look and three posts you can make for free.</p>
+  </header>
+  <div class="progress" aria-hidden="true"><span id="bar"></span></div>
+  <div id="log" role="log" aria-live="polite"></div>
+  <div id="composer"></div>
+  <noscript>This page needs JavaScript to run.</noscript>
+</div>
+
+<script>
+/* =====================================================================
+   1. PURE LOGIC (no page code here, easy to test and to change)
+   ===================================================================== */
+const words = s => s.trim().split(/\s+/).filter(Boolean);
+const cap = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+
+// Guess what kind of message the owner wants to promote.
+function classify(t) {
+  const s = t.toLowerCase();
+  if (/(\d+\s?%|\boff\b|\bsale\b|discount|\bdeal\b|£|bogof|2[- ]?for[- ]?1|voucher|half price)/.test(s)) return 'offer';
+  if (/(night|event|party|workshop|market|launch|opening|open mic|class|festival|gig|concert|tournament|meetup|social|show|live music)/.test(s)) return 'event';
+  if (/(menu|\bnew\b|flavou?r|collection|range|dish|product|batch|season|special|arrival|drink|bake|coffee|cake)/.test(s)) return 'product';
+  return 'story';
+}
+
+// "Jazz night on Friday, 2-for-1 cocktails" -> two separate messages.
+// Only splits when EVERY piece has at least two words, so "pastries and coffee" stays whole.
+function splitIdeas(t) {
+  const parts = t.split(/\s*(?:,|;|&|\+|\band\b|\bplus\b|\/)\s*/i).map(p => p.trim()).filter(Boolean);
+  const real = parts.filter(p => words(p).length >= 2);
+  return (real.length >= 2 && real.length === parts.length) ? real.slice(0, 4) : [];
+}
+
+const PALETTES = {
+  Cosy: ['#E8B07A', '#7A4B2A', '#FFF3E0'], Sleek: ['#111111', '#F5F5F5', '#C8A96A'],
+  Playful: ['#FF5E5B', '#FFD23F', '#3BCEAC'], Serious: ['#12263A', '#FFFFFF', '#D1495B'],
+  Handmade: ['#C97B4A', '#F2E3C6', '#4F6D5A'], Modern: ['#1D3557', '#F1FAEE', '#E63946'],
+  Bold: ['#FF3D00', '#111111', '#FFE600'], Calm: ['#A8C3BC', '#F6F3EE', '#3D5A80'],
+  Friendly: ['#FF8C42', '#FFF1D6', '#2A9D8F'], Premium: ['#1B1B1B', '#D4AF37', '#F7F1E3']
+};
+const FONTS = {
+  Playful: 'Poppins (bold for the main message) with Nunito for small text',
+  Bold: 'Poppins (bold for the main message) with Nunito for small text',
+  Friendly: 'Poppins (bold for the main message) with Nunito for small text',
+  Sleek: 'Montserrat or Inter, with lots of empty space',
+  Modern: 'Montserrat or Inter, with lots of empty space',
+  Premium: 'Montserrat or Inter, with lots of empty space',
+  Cosy: 'Fraunces or Lora for the headline, Inter for small text',
+  Handmade: 'Fraunces or Lora for the headline, Inter for small text',
+  Serious: 'Inter or Source Serif, regular weight, generous spacing',
+  Calm: 'Inter or Source Serif, regular weight, generous spacing'
+};
+const VOICES = {
+  Playful: 'Light and a little cheeky. Use emoji sparingly.',
+  Serious: 'Calm and confident. No exclamation marks.',
+  Premium: 'Calm and confident. No exclamation marks.',
+  Cosy: 'Warm, like talking to a regular.',
+  Friendly: 'Warm, like talking to a regular.',
+  Handmade: 'Warm and honest, like talking to a regular.',
+  Bold: 'Short and punchy.',
+  Sleek: 'Clean and direct. Fewer words.',
+  Modern: 'Clean and direct. Fewer words.',
+  Calm: 'Gentle and reassuring.'
+};
+const PHOTOS = {
+  Cosy: 'warm light, close-ups of hands, steam and texture',
+  Handmade: 'warm light, close-ups of hands, steam and texture',
+  Sleek: 'clean backgrounds with plenty of empty space',
+  Modern: 'clean backgrounds with plenty of empty space',
+  Premium: 'clean backgrounds with plenty of empty space',
+  Playful: 'bright, close and a bit messy is fine',
+  Bold: 'bright, close and a bit messy is fine',
+  Friendly: 'bright, natural, with people in the shot',
+  Calm: 'soft daylight and wider shots',
+  Serious: 'soft daylight, one subject, nothing in the background'
+};
+
+function ideasFor(A) {
+  const when = A.when && A.when !== 'No end date' ? A.when : '';
+  const type = A.offerType || 'story';
+  let list;
+  if (type === 'offer') list = [
+    { title: 'The big number', what: `Make "${A.offer}" the biggest thing on the post, about a third of the space. Your name goes small in a corner${when ? `, with "${when.toLowerCase()}" underneath` : ''}.`, notice: 'The offer' },
+    { title: 'One photo, one line', what: 'Use your best photo of what you sell and put the offer as a single short line on a calm part of the picture.', notice: 'The offer, then the photo' },
+    { title: 'Last-chance reminder', what: when ? 'Post the same offer again on the last day with "ends tonight" or "last day".' : 'Repeat the offer once a week with a fresh photo, so regulars keep seeing it.', notice: when ? 'The deadline' : 'The offer' }
+  ];
+  else if (type === 'event') list = [
+    { title: 'Date first', what: `Make the day and time the biggest text${A.when ? ` ("${A.when}")` : ''}, then the event name just below it. Add the place in smaller text.`, notice: 'The date' },
+    { title: 'Behind the scenes', what: 'Post a 10-second clip or photo of you getting ready for it, with the event name as the only caption line.', notice: 'The event name' },
+    { title: 'The day-before reminder', what: 'Post a simple "tomorrow" or "tonight" reminder with the same layout as your first post, so people recognise it.', notice: '"Tonight" or "Tomorrow"' }
+  ];
+  else if (type === 'product') list = [
+    { title: 'Hero shot', what: 'One close-up photo of it on a plain background, with its name below in large text.', notice: 'The product' },
+    { title: 'Made today', what: `A short clip or photo of it being made or prepared${A.special ? `, with "${A.special}" as the caption` : ''}.`, notice: 'The process' },
+    { title: 'First reactions', what: 'Ask a customer what they think and post a photo with their one-line quote.', notice: 'The quote' }
+  ];
+  else list = [
+    { title: 'Meet the maker', what: 'A friendly portrait of you or your team with one sentence about why you do this.', notice: 'Your face' },
+    { title: 'Why we started', what: 'A photo of where it all began with a short caption in your own words.', notice: 'The first line of your story' },
+    { title: "Regulars' favourites", what: 'A post showing what regulars order most, with the name of each favourite.', notice: 'The favourite' }
+  ];
+  return list.map((x, i) => ({ ...x, tag: i === 0 ? 'Start here' : 'If you have time' }));
+}
+
+function whereFor(A) {
+  const map = {
+    'Instagram': 'Instagram: post idea 1 as a portrait image (1080 × 1350) and repeat the message as a story (1080 × 1920).',
+    'WhatsApp': 'WhatsApp: send the image with a one-line caption to a broadcast list or your Status, and ask regulars to forward it.',
+    'Facebook group': 'Local Facebook groups: share the same image and write the offer in the caption too. Check the group rules on promotion first.',
+    'Shop window or poster': 'Shop window: print idea 1 at A4 or A3 and put the main message where eyes land at standing height.',
+    'Word of mouth': 'Word of mouth: say it out loud at the till and put it on a small card with each receipt.'
+  };
+  return (A.channels || []).map(c => map[c]).filter(Boolean);
+}
+
+function freeTipsFor(A) {
+  const has = x => (A.assets || []).includes(x);
+  const tier = (A.budget || '').startsWith('Almost') ? 0 : (A.budget || '').startsWith('Some') ? 1 : 2;
+  const tips = [];
+  if (has('Phone photos') || has('Nothing yet') || !(A.assets || []).length)
+    tips.push('Photos: use your phone next to a window in daylight, no flash, and wipe the lens first.');
+  tips.push(has('A Canva account')
+    ? 'Design: start from a blank 1080 × 1350 post in Canva and keep only the main message and your name.'
+    : 'Design: Canva has a free plan with "Instagram Post" templates. Delete everything except the main message and your name.');
+  tips.push('Fonts and colours: use only the ones in this brief. Everything is free on Google Fonts and Canva.');
+  tips.push(tier === 0 ? 'Time: do only idea 1 this week. It takes about 15 minutes.'
+    : tier === 1 ? 'Time: do ideas 1 and 2 this week and keep idea 3 for next week.'
+    : 'Time: spread all three over a week, one post every two or three days.');
+  if (tier > 0 && (A.channels || []).includes('Shop window or poster'))
+    tips.push('Optional: print your window poster at a local print shop. It is usually a few pounds.');
+  return tips;
+}
+
+function buildBrief(A) {
+  const vibes = A.vibe && A.vibe.length ? A.vibe : ['Friendly'];
+  const colours = [];
+  vibes.slice(0, 2).forEach((v, i) => (PALETTES[v] || []).slice(0, i === 0 ? 3 : 2).forEach(c => { if (!colours.includes(c)) colours.push(c); }));
+  const voice = [...new Set(vibes.slice(0, 2).map(v => VOICES[v]).filter(Boolean))].join(' ');
+  const when = A.when && A.when !== 'No end date' ? A.when : '';
+  let core = cap(A.offer || 'Your main message');
+  if (A.offerType === 'offer' && when) core += ' · ' + when.toLowerCase();
+  if (A.offerType === 'event' && A.when) core += ' · ' + A.when;
+  if (A.offerType === 'product' && A.special) core += ' · ' + A.special;
+  return {
+    core,
+    notice: (A.offer || '').slice(0, 80),
+    audience: cap(A.audience || 'Your regulars'),
+    different: A.why ? cap(A.why) : '',
+    tone: vibes.map(v => v.toLowerCase()).join(', '),
+    voice,
+    colours: colours.slice(0, 5),
+    font: FONTS[vibes[0]] || FONTS.Friendly,
+    photo: PHOTOS[vibes[0]] || PHOTOS.Friendly,
+    ideas: ideasFor(A),
+    where: whereFor(A),
+    free: freeTipsFor(A)
+  };
+}
+
+function briefToText(b) {
+  const L = [];
+  L.push('MY CREATIVE BRIEF', '', 'Core message: ' + b.core, 'Who it is for: ' + b.audience);
+  if (b.different) L.push('What makes us different: ' + b.different);
+  L.push('Tone: ' + b.tone + '. ' + b.voice, 'Colours: ' + b.colours.join(', '), 'Fonts: ' + b.font, 'Photos: ' + b.photo, '', 'POST IDEAS');
+  b.ideas.forEach((x, i) => L.push(`${i + 1}. ${x.title} (${x.tag}): ${x.what} People should notice first: ${x.notice}.`));
+  L.push('', 'WHERE TO POST'); b.where.forEach(w => L.push('- ' + w));
+  L.push('', 'MAKE IT FOR FREE'); b.free.forEach(w => L.push('- ' + w));
+  return L.join('\n');
+}
+
+/* =====================================================================
+   2. THE QUESTIONS
+   Each question: id, kind ('choice' | 'text' | 'multi'), text, options...
+   after(value) runs once the person answers. It can add follow-up questions
+   with insertNext(...). That is what makes the chat adapt to the replies.
+   ===================================================================== */
+const CHIPS_BY_GOAL = {
+  'More people through the door': ['Weekend offer: ', 'New on the menu: ', 'Now open late on '],
+  'More online orders': ['Free delivery on ', 'New product: ', 'Bundle deal: '],
+  'Fill an event': ['Live music on ', 'Workshop on ', 'Grand opening on '],
+  'Get known locally': ['Our story: ', 'Meet the team: ', 'Why we started: ']
+};
+
+function detailQs(type) {
+  if (type === 'offer') return [{ id: 'when', kind: 'choice', text: 'When does it end?', options: ['This weekend', 'This week', 'This month', 'No end date'] }];
+  if (type === 'event') return [{ id: 'when', kind: 'text', text: 'What day, time and place? One line is fine.', placeholder: 'e.g. Friday 8pm, 12 Elvet Bridge' }];
+  if (type === 'product') return [{ id: 'special', kind: 'text', text: 'What makes it special, in your own words?', placeholder: 'e.g. baked fresh every morning' }];
+  return [];
+}
+
+// Decides what to ask next about the main message.
+async function resolveOffer(v, noMore) {
+  A.offer = v.trim().replace(/[.!\s]+$/, '');
+  const parts = splitIdeas(A.offer);
+  if (parts.length) {                       // several messages in one reply -> ask them to pick one
+    insertNext({
+      id: 'offerPick', kind: 'choice',
+      text: `That's ${parts.length} messages in one. People only remember one at a time. Which matters most this week?`,
+      options: parts, after: c => resolveOffer(c, true)
+    });
+    return;
+  }
+  if (!noMore && words(A.offer).length < 3) { // too vague -> ask for detail
+    const first = A.offer;
+    insertNext({
+      id: 'offerMore', kind: 'text',
+      text: 'Can you add a detail? For example how much, which product, or which day.',
+      placeholder: 'e.g. 50% off all pastries, Saturday and Sunday',
+      after: d => resolveOffer(first + ' ' + d, true)
+    });
+    return;
+  }
+  A.offerType = classify(A.offer);           // offer / event / product / story -> different follow-up
+  insertNext(...detailQs(A.offerType));
+}
+
+const Q = {
+  goal: {
+    id: 'goal', kind: 'choice',
+    text: 'What would help your business most in the next month?',
+    options: ['More people through the door', 'More online orders', 'Fill an event', 'Get known locally', 'Something else'],
+    after: v => { if (v === 'Something else') insertNext({ id: 'goal', kind: 'text', text: 'No problem. In a few words, what would help most?', placeholder: 'e.g. more weekday lunch customers' }); }
+  },
+  offer: {
+    id: 'offerRaw', kind: 'text',
+    text: () => A.goal === 'Fill an event' ? "What's the event? Tell me in your own words." : "What's one thing you'd love people to know this week?",
+    placeholder: 'e.g. 50% off pastries this weekend',
+    chips: () => CHIPS_BY_GOAL[A.goal] || [],
+    after: v => resolveOffer(v, false)
+  },
+  audience: {
+    id: 'audience', kind: 'choice', allowText: true,
+    text: 'Now think of your best customer. Who are they?',
+    options: ['Students', 'Families', 'Local regulars', 'Young professionals', 'Tourists', 'Everyone'],
+    after: v => {
+      if (/\b(everyone|everybody|anyone|anybody|all)\b/i.test(v))
+        insertNext({ id: 'audience', kind: 'text', text: '"Everyone" is hard to design for. Think of the last person who bought from you. Who were they?', placeholder: 'e.g. a student buying lunch between lectures' });
+    }
+  },
+  why: {
+    id: 'why', kind: 'choice', allowText: true,
+    text: 'What do your regulars say they love about you?',
+    options: ['Friendly service', 'Great prices', 'Handmade / homemade', 'Quality', 'Local and independent', 'Convenient']
+  },
+  vibe: {
+    id: 'vibe', kind: 'multi', max: 3,
+    text: 'Which words fit your business best? Pick up to three.',
+    options: ['Cosy', 'Sleek', 'Playful', 'Serious', 'Handmade', 'Modern', 'Bold', 'Calm', 'Friendly', 'Premium']
+  },
+  assets: {
+    id: 'assets', kind: 'multi', exclusive: 'Nothing yet',
+    text: 'What do you already have to work with?',
+    options: ['Phone photos', 'Product photos', 'A logo', 'A Canva account', 'Nothing yet'],
+    after: v => { if (v.includes('Nothing yet')) say("That's fine. A phone and window light are enough, and I'll show you how."); }
+  },
+  budget: {
+    id: 'budget', kind: 'choice',
+    text: 'How much time and money can you spare?',
+    options: ['Almost none: 30 minutes a week, £0', 'Some: 1–2 hours a week, under £20', 'More: I can invest time and a bit of money']
+  },
+  channels: {
+    id: 'channels', kind: 'multi', exclusive: 'Not sure yet',
+    text: 'Where do your customers already look?',
+    options: ['Instagram', 'WhatsApp', 'Facebook group', 'Shop window or poster', 'Word of mouth', 'Not sure yet'],
+    after: v => {
+      if (v.includes('Not sure yet')) {
+        A.channels = ['Instagram', 'Shop window or poster'];
+        say("No problem. I'll start you with Instagram and a poster for your window.");
+      }
+    }
+  }
+};
+const BASE = [Q.goal, Q.offer, Q.audience, Q.why, Q.vibe, Q.assets, Q.budget, Q.channels];
+
+/* =====================================================================
+   3. THE CHAT ENGINE
+   ===================================================================== */
+const logEl = document.getElementById('log');
+const composer = document.getElementById('composer');
+const bar = document.getElementById('bar');
+let A = {}, queue = [], asked = 0, currentQ = null;
+
+function el(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text !== undefined) e.textContent = text;
+  return e;
+}
+function insertNext(...qs) { queue.unshift(...qs); }
+function scrollDown() { logEl.lastElementChild && logEl.lastElementChild.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+function add(cls, text) { const m = el('div', 'msg ' + cls, text); logEl.appendChild(m); scrollDown(); return m; }
+function me(text) { add('me', text); }
+function say(text) { add('bot', text); }
+function bot(text, delay = 450) {
+  return new Promise(resolve => {
+    const t = add('bot typing', '…');
+    setTimeout(() => { t.className = 'msg bot'; t.textContent = text; scrollDown(); resolve(); }, delay);
+  });
+}
+function setBar(r) { bar.style.width = Math.round(r * 100) + '%'; }
+
+async function next() {
+  if (!queue.length) return finish();
+  currentQ = queue.shift();
+  asked++;
+  setBar((asked - 1) / (asked + queue.length));
+  const text = typeof currentQ.text === 'function' ? currentQ.text() : currentQ.text;
+  await bot(text);
+  renderComposer(currentQ);
+}
+
+async function submit(q, value, display) {
+  composer.replaceChildren();
+  me(display !== undefined ? display : String(value));
+  A[q.id] = value;
+  if (q.after) await q.after(value);
+  next();
+}
+
+function renderComposer(q) {
+  composer.replaceChildren();
+  if (q.kind === 'choice') {
+    const row = el('div', 'row');
+    q.options.forEach(o => { const b = el('button', 'chip', o); b.type = 'button'; b.onclick = () => submit(q, o); row.appendChild(b); });
+    composer.appendChild(row);
+    if (q.allowText) { composer.appendChild(el('div', 'hint', 'Or type your own:')); composer.appendChild(textField(q, 'Type here')); }
+    row.firstChild.focus();
+  } else if (q.kind === 'text') {
+    const sug = q.chips ? q.chips() : [];
+    if (sug.length) {
+      const row = el('div', 'row');
+      sug.forEach(s => { const b = el('button', 'chip soft', s.trim().replace(/[:]$/, '') + '…'); b.type = 'button'; b.onclick = () => { input.value = s; input.focus(); input.setSelectionRange(s.length, s.length); }; row.appendChild(b); });
+      composer.appendChild(el('div', 'hint', 'Need a start? Tap one and finish it:'));
+      composer.appendChild(row);
+    }
+    const f = textField(q, q.placeholder || 'Type your answer');
+    var input = f.querySelector('input');
+    composer.appendChild(f);
+    input.focus();
+  } else if (q.kind === 'multi') {
+    const picked = new Set();
+    const row = el('div', 'row');
+    const done = el('button', 'primary', 'Done'); done.type = 'button'; done.disabled = true;
+    const chips = {};
+    q.options.forEach(o => {
+      const b = el('button', 'chip', o); b.type = 'button'; b.setAttribute('aria-pressed', 'false'); chips[o] = b;
+      b.onclick = () => {
+        if (picked.has(o)) picked.delete(o);
+        else {
+          if (q.exclusive) {
+            if (o === q.exclusive) picked.clear();
+            else picked.delete(q.exclusive);
+          }
+          if (q.max && picked.size >= q.max && o !== q.exclusive) return;
+          picked.add(o);
+        }
+        Object.entries(chips).forEach(([k, btn]) => { btn.classList.toggle('on', picked.has(k)); btn.setAttribute('aria-pressed', picked.has(k)); });
+        done.disabled = picked.size === 0;
+      };
+      row.appendChild(b);
+    });
+    done.onclick = () => { const v = [...picked]; submit(q, v, v.join(', ')); };
+    composer.appendChild(row);
+    if (q.max) composer.appendChild(el('div', 'hint', 'Pick up to ' + q.max + '.'));
+    composer.appendChild(done);
+    row.firstChild.focus();
+  }
+}
+
+function textField(q, placeholder) {
+  const f = el('form', 'field');
+  const i = el('input'); i.type = 'text'; i.placeholder = placeholder; i.setAttribute('aria-label', 'Your answer'); i.maxLength = 200;
+  const b = el('button', 'primary', 'Send'); b.type = 'submit';
+  f.append(i, b);
+  f.onsubmit = e => { e.preventDefault(); const v = i.value.trim(); if (v) submit(q, v); };
+  return f;
+}
+
+/* =====================================================================
+   4. SHOWING THE BRIEF
+   ===================================================================== */
+function textOn(hex) {
+  const n = parseInt(hex.slice(1), 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255;
+  return (0.299 * r + 0.587 * g + 0.114 * b) > 150 ? '#120709' : '#F7EEDC';
+}
+function section(card, title, node) { card.append(el('h3', '', title), node); }
+function list(items) { const u = el('ul'); items.forEach(t => u.appendChild(el('li', '', t))); return u; }
+
+function renderBrief(b) {
+  const card = el('div', 'brief');
+  card.appendChild(el('h2', '', 'Your creative brief'));
+
+  const core = el('div', 'core'); core.appendChild(el('mark', '', b.core));
+  section(card, 'What people should notice first', core);
+  section(card, 'Who it is for', el('div', '', b.audience + (b.different ? '. What makes you different: ' + b.different.toLowerCase() + '.' : '')));
+  section(card, 'How it should sound', el('div', '', 'Tone: ' + b.tone + '. ' + b.voice));
+
+  const look = el('div');
+  const sw = el('div', 'swatches');
+  b.colours.forEach(c => { const s = el('div', 'sw', c); s.style.background = c; s.style.color = textOn(c); sw.appendChild(s); });
+  look.append(sw, el('div', '', 'Fonts: ' + b.font), el('div', '', 'Photos: ' + b.photo));
+  section(card, 'Look and feel', look);
+
+  const ideas = el('div', 'ideas');
+  b.ideas.forEach((x, i) => {
+    const d = el('div', 'idea');
+    const t = el('b', '', (i + 1) + '. ' + x.title);
+    t.appendChild(el('span', 'tag' + (i ? ' later' : ''), x.tag));
+    d.append(t, el('div', '', x.what), el('div', 'notice', 'People should notice first: ' + x.notice));
+    ideas.appendChild(d);
+  });
+  section(card, 'Three posts you can make', ideas);
+  if (b.where.length) section(card, 'Where to post', list(b.where));
+  section(card, 'Make it for free', list(b.free));
+
+  const actions = el('div', 'actions');
+  const check = el('a', 'primary', 'Check my post with Saccade →');
+  check.href = './?notice=' + encodeURIComponent(b.notice) + '#try';
+  const copy = el('button', 'secondary', 'Copy this brief'); copy.type = 'button';
+  copy.onclick = async () => {
+    try { await navigator.clipboard.writeText(briefToText(b)); copy.textContent = 'Copied ✓'; }
+    catch (e) { copy.textContent = 'Could not copy'; }
+  };
+  const again = el('button', 'secondary', 'Start again'); again.type = 'button';
+  again.onclick = start;
+  actions.append(check, copy, again);
+  card.appendChild(actions);
+
+  logEl.appendChild(card);
+  card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function finish() {
+  setBar(1);
+  composer.replaceChildren();
+  await bot("That's everything I need. Here's your creative brief.");
+  renderBrief(buildBrief(A));
+}
+
+async function start() {
+  A = {}; queue = [...BASE]; asked = 0; currentQ = null;
+  logEl.replaceChildren(); composer.replaceChildren(); setBar(0);
+  await bot("Hi! I'll ask a few quick questions to work out what to say and how to say it. You don't need any design knowledge, and nothing here costs money.", 300);
+  next();
+}
+if (typeof document !== 'undefined' && !window.__NO_AUTOSTART) start();
+</script>
+</body>
+</html>
