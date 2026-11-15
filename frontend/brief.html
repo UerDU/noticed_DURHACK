@@ -17,6 +17,7 @@
     --serif: 'Instrument Serif', Georgia, serif; --mono: 'JetBrains Mono', ui-monospace, monospace;
   }
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
   body {
     margin: 0; min-height: 100vh; color: var(--ink); line-height: 1.5;
     font-family: Inter, system-ui, sans-serif;
@@ -81,6 +82,36 @@
   a.primary { text-decoration: none; display: inline-block; font-weight: 700; border-radius: 999px; padding: 12px 20px; background: var(--accent); color: var(--bg); }
   button.secondary { font: inherit; font-weight: 600; padding: 11px 18px; border-radius: 999px; border: 1px solid var(--line); background: rgba(255,255,255,0.06); color: var(--ink); cursor: pointer; }
   button.secondary:hover { background: rgba(255,255,255,0.12); }
+
+  /* step-by-step questions (one per screen) */
+  .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; min-height: 40px; }
+  .backbtn { font: inherit; font-size: 16px; font-weight: 600; color: var(--ink); background: rgba(255,255,255,0.06); border: 1px solid var(--line); border-radius: 999px; padding: 8px 16px; cursor: pointer; }
+  .backbtn:disabled { visibility: hidden; }
+  .steptxt { font-size: 15px; color: var(--muted); }
+  .card { background: var(--glass); border: 1px solid rgba(255,255,255,0.22); border-radius: 28px; padding: clamp(22px, 5vw, 36px); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); animation: cardIn .35s ease both; }
+  @keyframes cardIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+  .card h2 { font-size: clamp(24px, 4.2vw, 32px); line-height: 1.2; letter-spacing: -0.5px; margin: 0 0 6px; }
+  .card .sub { color: var(--muted); font-size: 17px; margin: 0 0 22px; }
+  .note { display: inline-block; background: rgba(216,151,60,0.16); border: 1px solid rgba(216,151,60,0.45); color: #F3D8A8; border-radius: 14px; padding: 8px 14px; font-size: 15px; margin-bottom: 16px; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+  .tile { font: inherit; font-size: 18px; font-weight: 600; text-align: left; color: var(--ink); min-height: 64px; padding: 16px 18px; border-radius: 18px; cursor: pointer;
+    background: rgba(255,255,255,0.06); border: 1.5px solid rgba(255,255,255,0.18); display: flex; align-items: center; gap: 12px; transition: background .15s, border-color .15s, transform .1s; }
+  .tile:hover { background: rgba(253,155,183,0.1); border-color: rgba(253,155,183,0.6); }
+  .tile:active { transform: scale(0.98); }
+  .tile .box { flex: 0 0 auto; width: 26px; height: 26px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.35); display: grid; place-items: center; font-size: 15px; color: var(--bg); }
+  .tile.multi .box { border-radius: 8px; }
+  .tile.on { background: rgba(253,155,183,0.2); border-color: var(--accent); }
+  .tile.on .box { background: var(--accent); border-color: var(--accent); }
+  .bigin { width: 100%; font: inherit; font-size: 20px; padding: 16px 18px; border-radius: 18px; border: 1.5px solid rgba(255,255,255,0.25); background: rgba(255,255,255,0.07); color: var(--ink); }
+  .bigin:focus { border-color: var(--accent); outline: none; }
+  .bigin::placeholder { color: var(--muted); }
+  .starters { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 0; }
+  .nextrow { display: flex; align-items: center; gap: 14px; margin-top: 24px; flex-wrap: wrap; }
+  .nextbtn { font: inherit; font-size: 18px; font-weight: 700; border: 0; border-radius: 999px; padding: 15px 30px; background: var(--accent); color: var(--bg); cursor: pointer; }
+  .nextbtn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .linkish { font: inherit; font-size: 16px; background: none; border: 0; color: var(--accent); cursor: pointer; padding: 6px 0; text-decoration: underline; text-underline-offset: 3px; }
+  .welcome ul { list-style: none; padding: 0; margin: 0 0 6px; display: grid; gap: 10px; font-size: 17px; }
+  .welcome li::before { content: "✓"; color: var(--accent); font-weight: 800; margin-right: 10px; }
 </style>
 </head>
 <body>
@@ -88,11 +119,14 @@
   <a class="back" href="./#try">← Back to the poster checker</a>
   <header>
     <h1>Not sure what <em>to say?</em></h1>
-    <p>Answer a few quick questions and we'll work out your message, your look and three posts you can make for free.</p>
+    <p>A few taps, about two minutes. We'll work out your message, your look and three posts you can make for free.</p>
   </header>
+  <div class="topbar" id="topbar" hidden>
+    <button type="button" class="backbtn" id="backBtn">← Back</button>
+    <span id="stepTxt" class="steptxt"></span>
+  </div>
   <div class="progress" aria-hidden="true"><span id="bar"></span></div>
-  <div id="log" role="log" aria-live="polite"></div>
-  <div id="composer"></div>
+  <main id="stage" aria-live="polite"></main>
   <noscript>This page needs JavaScript to run.</noscript>
 </div>
 
@@ -362,12 +396,15 @@ const Q = {
 const BASE = [Q.goal, Q.offer, Q.audience, Q.why, Q.vibe, Q.assets, Q.budget, Q.channels];
 
 /* =====================================================================
-   3. THE CHAT ENGINE
+   3. ONE QUESTION PER SCREEN
+   Big tap targets, plain words, a Back button, no chat. Most answers are a
+   single tap; typing is only asked for when we really need their words.
    ===================================================================== */
-const logEl = document.getElementById('log');
-const composer = document.getElementById('composer');
+const stage = document.getElementById('stage');
+const logEl = stage;                       // the brief is drawn here at the end
 const bar = document.getElementById('bar');
-let A = {}, queue = [], asked = 0, currentQ = null;
+const topbar = document.getElementById('topbar'), backBtn = document.getElementById('backBtn'), stepTxt = document.getElementById('stepTxt');
+let A = {}, queue = [], history = [], note = '';
 
 function el(tag, cls, text) {
   const e = document.createElement(tag);
@@ -376,92 +413,101 @@ function el(tag, cls, text) {
   return e;
 }
 function insertNext(...qs) { queue.unshift(...qs); }
-function scrollDown() { logEl.lastElementChild && logEl.lastElementChild.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
-function add(cls, text) { const m = el('div', 'msg ' + cls, text); logEl.appendChild(m); scrollDown(); return m; }
-function me(text) { add('me', text); }
-function say(text) { add('bot', text); }
-function bot(text, delay = 450) {
-  return new Promise(resolve => {
-    const t = add('bot typing', '…');
-    setTimeout(() => { t.className = 'msg bot'; t.textContent = text; scrollDown(); resolve(); }, delay);
-  });
-}
+function say(text) { note = text; }                       // a friendly note shown on the next screen
 function setBar(r) { bar.style.width = Math.round(r * 100) + '%'; }
+const clone = o => JSON.parse(JSON.stringify(o));
 
-async function next() {
+function go() {
   if (!queue.length) return finish();
-  currentQ = queue.shift();
-  asked++;
-  setBar((asked - 1) / (asked + queue.length));
-  const text = typeof currentQ.text === 'function' ? currentQ.text() : currentQ.text;
-  await bot(text);
-  renderComposer(currentQ);
+  show(queue.shift(), undefined);
 }
-
-async function submit(q, value, display) {
-  composer.replaceChildren();
-  me(display !== undefined ? display : String(value));
-  A[q.id] = value;
+let current = null;
+async function answer(q, value) {
+  history.push({ q, prev: value, A: clone(A), queue: [...queue], note });
+  A[q.id] = value; note = '';
   if (q.after) await q.after(value);
-  next();
+  go();
 }
+function back() {
+  const h = history.pop(); if (!h) return;
+  A = h.A; queue = h.queue; note = h.note;
+  show(h.q, h.prev);
+}
+backBtn.onclick = back;
 
-function renderComposer(q) {
-  composer.replaceChildren();
+function show(q, prev) {
+  current = q;
+  const n = history.length + 1, total = history.length + 1 + queue.length;
+  topbar.hidden = false; backBtn.disabled = history.length === 0;
+  stepTxt.textContent = `Question ${n} of ${Math.max(total, n)}`;
+  setBar((n - 1) / Math.max(total, n));
+  const card = el('section', 'card');
+  if (note) card.appendChild(el('div', 'note', note));
+  card.appendChild(el('h2', '', typeof q.text === 'function' ? q.text() : q.text));
+  const sub = q.kind === 'multi' ? (q.max ? `Tap up to ${q.max}, then press Next.` : 'Tap all that fit, then press Next.')
+            : q.kind === 'choice' ? 'Tap one.' : 'A few words is plenty.';
+  card.appendChild(el('p', 'sub', sub));
+
   if (q.kind === 'choice') {
-    const row = el('div', 'row');
-    q.options.forEach(o => { const b = el('button', 'chip', o); b.type = 'button'; b.onclick = () => submit(q, o); row.appendChild(b); });
-    composer.appendChild(row);
-    if (q.allowText) { composer.appendChild(el('div', 'hint', 'Or type your own:')); composer.appendChild(textField(q, 'Type here')); }
-    row.firstChild.focus();
-  } else if (q.kind === 'text') {
-    const sug = q.chips ? q.chips() : [];
-    if (sug.length) {
-      const row = el('div', 'row');
-      sug.forEach(s => { const b = el('button', 'chip soft', s.trim().replace(/[:]$/, '') + '…'); b.type = 'button'; b.onclick = () => { input.value = s; input.focus(); input.setSelectionRange(s.length, s.length); }; row.appendChild(b); });
-      composer.appendChild(el('div', 'hint', 'Need a start? Tap one and finish it:'));
-      composer.appendChild(row);
-    }
-    const f = textField(q, q.placeholder || 'Type your answer');
-    var input = f.querySelector('input');
-    composer.appendChild(f);
-    input.focus();
-  } else if (q.kind === 'multi') {
-    const picked = new Set();
-    const row = el('div', 'row');
-    const done = el('button', 'primary', 'Done'); done.type = 'button'; done.disabled = true;
-    const chips = {};
+    const tiles = el('div', 'tiles');
     q.options.forEach(o => {
-      const b = el('button', 'chip', o); b.type = 'button'; b.setAttribute('aria-pressed', 'false'); chips[o] = b;
-      b.onclick = () => {
+      const t = el('button', 'tile'); t.type = 'button';
+      t.append(el('span', 'box'), el('span', '', o));
+      if (prev === o) t.classList.add('on');
+      t.onclick = () => { tiles.querySelectorAll('.tile').forEach(x => x.classList.remove('on')); t.classList.add('on'); t.querySelector('.box').textContent = '✓'; setTimeout(() => answer(q, o), 260); };
+      tiles.appendChild(t);
+    });
+    card.appendChild(tiles);
+    if (q.allowText) {
+      const more = el('button', 'linkish', 'None of these? Write your own'); more.type = 'button';
+      const wrap = el('div'); wrap.hidden = true;
+      more.onclick = () => { wrap.hidden = false; more.hidden = true; wrap.querySelector('input').focus(); };
+      wrap.appendChild(textBlock(q, 'Type it here', prev && !q.options.includes(prev) ? prev : ''));
+      const r = el('div', 'nextrow'); r.appendChild(more); card.append(r, wrap);
+    }
+  } else if (q.kind === 'text') {
+    card.appendChild(textBlock(q, q.placeholder || 'Type here', typeof prev === 'string' ? prev : ''));
+  } else if (q.kind === 'multi') {
+    const picked = new Set(Array.isArray(prev) ? prev : []);
+    const tiles = el('div', 'tiles'); const btns = {};
+    const nextB = el('button', 'nextbtn', 'Next →'); nextB.type = 'button';
+    const paint = () => { Object.entries(btns).forEach(([k, b]) => { const on = picked.has(k); b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); b.querySelector('.box').textContent = on ? '✓' : ''; }); nextB.disabled = picked.size === 0; };
+    q.options.forEach(o => {
+      const t = el('button', 'tile multi'); t.type = 'button'; t.append(el('span', 'box'), el('span', '', o)); btns[o] = t;
+      t.onclick = () => {
         if (picked.has(o)) picked.delete(o);
         else {
-          if (q.exclusive) {
-            if (o === q.exclusive) picked.clear();
-            else picked.delete(q.exclusive);
-          }
+          if (q.exclusive) { if (o === q.exclusive) picked.clear(); else picked.delete(q.exclusive); }
           if (q.max && picked.size >= q.max && o !== q.exclusive) return;
           picked.add(o);
         }
-        Object.entries(chips).forEach(([k, btn]) => { btn.classList.toggle('on', picked.has(k)); btn.setAttribute('aria-pressed', picked.has(k)); });
-        done.disabled = picked.size === 0;
+        paint();
       };
-      row.appendChild(b);
+      tiles.appendChild(t);
     });
-    done.onclick = () => { const v = [...picked]; submit(q, v, v.join(', ')); };
-    composer.appendChild(row);
-    if (q.max) composer.appendChild(el('div', 'hint', 'Pick up to ' + q.max + '.'));
-    composer.appendChild(done);
-    row.firstChild.focus();
+    nextB.onclick = () => answer(q, [...picked]);
+    const r = el('div', 'nextrow'); r.appendChild(nextB);
+    card.append(tiles, r); paint();
   }
+  stage.replaceChildren(card);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-function textField(q, placeholder) {
-  const f = el('form', 'field');
-  const i = el('input'); i.type = 'text'; i.placeholder = placeholder; i.setAttribute('aria-label', 'Your answer'); i.maxLength = 200;
-  const b = el('button', 'primary', 'Send'); b.type = 'submit';
-  f.append(i, b);
-  f.onsubmit = e => { e.preventDefault(); const v = i.value.trim(); if (v) submit(q, v); };
+function textBlock(q, placeholder, value) {
+  const f = el('form');
+  const i = el('input', 'bigin'); i.type = 'text'; i.placeholder = placeholder; i.maxLength = 200; i.value = value || ''; i.setAttribute('aria-label', 'Your answer');
+  f.appendChild(i);
+  const sug = q.chips ? q.chips() : [];
+  if (sug.length) {
+    const row = el('div', 'starters');
+    sug.forEach(s => { const b = el('button', 'chip soft', s.trim().replace(/[:]$/, '') + '…'); b.type = 'button'; b.onclick = () => { i.value = s; i.focus(); i.setSelectionRange(s.length, s.length); check(); }; row.appendChild(b); });
+    f.append(el('div', 'hint', 'Stuck? Tap one to start, then finish the sentence:'), row);
+  }
+  const r = el('div', 'nextrow'); const nb = el('button', 'nextbtn', 'Next →'); nb.type = 'submit'; r.appendChild(nb); f.appendChild(r);
+  const check = () => { nb.disabled = !i.value.trim(); };
+  i.oninput = check; check();
+  f.onsubmit = e => { e.preventDefault(); const v = i.value.trim(); if (v) answer(q, v); };
+  setTimeout(() => { if (window.matchMedia('(pointer: fine)').matches) i.focus(); }, 50);
   return f;
 }
 
@@ -520,17 +566,22 @@ function renderBrief(b) {
 }
 
 async function finish() {
-  setBar(1);
-  composer.replaceChildren();
-  await bot("That's everything I need. Here's your creative brief.");
+  setBar(1); topbar.hidden = true;
+  stage.replaceChildren();
   renderBrief(buildBrief(A));
 }
 
-async function start() {
-  A = {}; queue = [...BASE]; asked = 0; currentQ = null;
-  logEl.replaceChildren(); composer.replaceChildren(); setBar(0);
-  await bot("Hi! I'll ask a few quick questions to work out what to say and how to say it. You don't need any design knowledge, and nothing here costs money.", 300);
-  next();
+function start() {
+  A = {}; queue = [...BASE]; history = []; note = '';
+  topbar.hidden = true; setBar(0);
+  const card = el('section', 'card welcome');
+  card.append(el('h2', '', "Let's work out what to put on your poster."));
+  const ul = el('ul');
+  ['About 8 questions, mostly one tap each', 'No design skills needed', 'Nothing to pay, nothing to sign up for', 'You can go back and change an answer any time']
+    .forEach(t => ul.appendChild(el('li', '', t)));
+  const r = el('div', 'nextrow'); const b = el('button', 'nextbtn', "Let's start →"); b.type = 'button'; b.onclick = go; r.appendChild(b);
+  card.append(ul, r);
+  stage.replaceChildren(card);
 }
 if (typeof document !== 'undefined' && !window.__NO_AUTOSTART) start();
 </script>
