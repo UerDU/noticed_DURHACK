@@ -142,6 +142,47 @@ function analyse(rect) {
   drawCrowd();
 }
 
+
+/* ---------- thermal-camera heatmap (shared by "you" and "crowd") ---------- */
+// cold -> hot, like a thermal camera: deep blue, purple, red, orange, yellow, white
+const THERMAL = [[0, [8, 10, 60]], [0.18, [40, 20, 140]], [0.36, [140, 20, 150]], [0.54, [230, 40, 60]], [0.72, [255, 130, 20]], [0.88, [255, 225, 60]], [1, [255, 255, 235]]];
+function thermalColour(t) {
+  for (let k = 1; k < THERMAL.length; k++) if (t <= THERMAL[k][0]) {
+    const [a0, ca] = THERMAL[k - 1], [a1, cb] = THERMAL[k], f = (t - a0) / (a1 - a0);
+    return ca.map((v, j) => v + (cb[j] - v) * f);
+  }
+  return THERMAL[THERMAL.length - 1][1];
+}
+// people = [[ [x%, y%], ... ], ...]  (one list of gaze dots per person)
+async function paintThermal(canvas, img, people) {
+  if (!img.complete || !img.naturalWidth) await new Promise(res => { img.addEventListener("load", res, { once: true }); img.addEventListener("error", res, { once: true }); });
+  const W = 240, H = Math.max(1, Math.round(W * (img.naturalHeight || 4) / (img.naturalWidth || 3)));
+  canvas.width = W; canvas.height = H;
+  const grid = new Float32Array(W * H);
+  const rad = Math.round(W * 0.09), sig2 = 2 * (rad / 2.2) ** 2;
+  people.forEach(dots => {
+    const per = new Float32Array(W * H);                    // each person counts equally
+    dots.forEach(([x, y]) => {
+      const cx = Math.round(x / 100 * W), cy = Math.round(y / 100 * H);
+      for (let dy = -rad; dy <= rad; dy++) for (let dx = -rad; dx <= rad; dx++) {
+        const X = cx + dx, Y = cy + dy;
+        if (X >= 0 && X < W && Y >= 0 && Y < H) per[Y * W + X] += Math.exp(-(dx * dx + dy * dy) / sig2);
+      }
+    });
+    let m = 0; for (const v of per) m = Math.max(m, v);
+    if (m) for (let i = 0; i < per.length; i++) grid[i] += per[i] / m;
+  });
+  let mx = 0; for (const v of grid) mx = Math.max(mx, v);
+  const ctx = canvas.getContext("2d"), out = ctx.createImageData(W, H);
+  for (let i = 0; i < grid.length; i++) {
+    const t = mx ? Math.pow(grid[i] / mx, 0.7) : 0;
+    const c = thermalColour(t);
+    out.data[i * 4] = c[0]; out.data[i * 4 + 1] = c[1]; out.data[i * 4 + 2] = c[2];
+    out.data[i * 4 + 3] = Math.round(255 * (0.84 + 0.14 * t));   // cold areas stay see-through enough to read the poster
+  }
+  ctx.putImageData(out, 0, 0);
+}
+
 function renderResult({ pts, youOrder, aiOrder, pct, target, tYou, tAi }) {
   show("sResult");
   $("cmpImg").src = data.image;
@@ -157,8 +198,7 @@ function renderResult({ pts, youOrder, aiOrder, pct, target, tYou, tAi }) {
   });
   $("youLine").setAttribute("points", yourPts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" "));
 
-  $("heatLayer").innerHTML = pts.filter((_, i) => i % 2 === 0).map(p =>
-    `<div class="heat" style="left:${p.x}%;top:${p.y}%"></div>`).join("");
+  paintThermal($("youHeat"), $("cmpImg"), [pts.map(p => [p.x, p.y])]);
   $("tagLayer").innerHTML =
     r.eye_path.map((p, i) => `<div class="tag ai" style="left:${p.x}%;top:${p.y}%">0${i + 1}</div>`).join("") +
     yourPts.map((p, i) => `<div class="tag you" style="left:calc(${p.x}% + 18px);top:calc(${p.y}% + 18px)">${i + 1}</div>`).join("");
@@ -243,34 +283,9 @@ function drawCrowd() {
   $("crowdTags").innerHTML = r.eye_path.map((p, i) => `<div class="tag ai" style="left:${p.x}%;top:${p.y}%">0${i + 1}</div>`).join("");
 
   // heatmap
-  const img = $("crowdImg");
-  const paint = () => {
-    const cv = $("crowdHeat");
-    const W = 300, H = Math.round(300 * (img.naturalHeight || 4) / (img.naturalWidth || 3));
-    cv.width = W; cv.height = H;
-    const grid = new Float32Array(W * H);
-    const rad = Math.round(W * 0.06), sig2 = 2 * (rad / 2) ** 2;
-    crowd.forEach(person => person.p.forEach(([x, y]) => {
-      const cx = Math.round(x / 100 * W), cy = Math.round(y / 100 * H);
-      for (let dy = -rad; dy <= rad; dy++) for (let dx = -rad; dx <= rad; dx++) {
-        const X = cx + dx, Y = cy + dy;
-        if (X >= 0 && X < W && Y >= 0 && Y < H) grid[Y * W + X] += Math.exp(-(dx * dx + dy * dy) / sig2);
-      }
-    }));
-    let mx = 0; for (const v of grid) mx = Math.max(mx, v);
-    const ctx = cv.getContext("2d"), out = ctx.createImageData(W, H);
-    for (let i = 0; i < grid.length; i++) {
-      const t = mx ? grid[i] / mx : 0;
-      // cherry -> cotton candy -> pearl, transparent where nobody looked
-      const stops = [[0, [173, 40, 49]], [0.4, [253, 155, 183]], [0.75, [255, 214, 120]], [1, [255, 248, 225]]];
-      let c = stops[0][1];
-      for (let k = 1; k < stops.length; k++) if (t <= stops[k][0]) { const [a0, ca] = stops[k - 1], [a1, cb] = stops[k], f = (t - a0) / (a1 - a0); c = ca.map((v, j) => v + (cb[j] - v) * f); break; }
-      out.data[i * 4] = c[0]; out.data[i * 4 + 1] = c[1]; out.data[i * 4 + 2] = c[2];
-      out.data[i * 4 + 3] = t < 0.05 ? 0 : Math.round(255 * Math.min(0.85, 0.25 + t));
-    }
-    ctx.putImageData(out, 0, 0);
-  };
-  if (img.complete && img.naturalWidth) paint(); else img.onload = paint;
+  const cv = $("crowdHeat");
+  if (crowd.length) { cv.hidden = false; paintThermal(cv, $("crowdImg"), crowd.map(c => c.p)); }
+  else cv.hidden = true;
 
   // stats
   if (!crowd.length) {
@@ -306,9 +321,8 @@ $("saveCrowd").onclick = async () => {
   const ctx = c.getContext("2d");
   ctx.fillStyle = "#120709"; ctx.fillRect(0, 0, W, H);
   const pw = Math.round(700 * Math.min(1, (H - 140) / ph)), phh = Math.round(pw * img.naturalHeight / img.naturalWidth);
-  ctx.drawImage(img, 40, 100, pw, phh);
-  ctx.fillStyle = "rgba(18,7,9,0.55)"; ctx.fillRect(40, 100, pw, phh);
-  ctx.drawImage(heat, 40, 100, pw, phh);
+  ctx.filter = "grayscale(1) contrast(1.2)"; ctx.drawImage(img, 40, 100, pw, phh); ctx.filter = "none";
+  if (!heat.hidden) { ctx.imageSmoothingEnabled = true; ctx.drawImage(heat, 40, 100, pw, phh); }
   ctx.strokeStyle = "#F3E6BD"; ctx.setLineDash([8, 6]); ctx.lineWidth = 2; ctx.beginPath();
   data.result.eye_path.forEach((p, i) => { const x = 40 + p.x / 100 * pw, y = 100 + p.y / 100 * phh; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
   ctx.stroke(); ctx.setLineDash([]);
@@ -316,7 +330,7 @@ $("saveCrowd").onclick = async () => {
   ctx.font = "600 26px Inter, sans-serif";
   const lines = [["Looked at first", $("crowdFirst").textContent], ["Saw the message early", $("crowdTarget").textContent], ["AI matched this crowd", $("crowdMatch").textContent]];
   lines.forEach(([k, v], i) => { ctx.fillStyle = "#C2ACA2"; ctx.fillText(k, 40 + pw + 50, 160 + i * 110); ctx.fillStyle = "#FD9BB7"; ctx.font = "800 36px Inter, sans-serif"; ctx.fillText(v, 40 + pw + 50, 205 + i * 110); ctx.font = "600 26px Inter, sans-serif"; });
-  ctx.fillStyle = "#C2ACA2"; ctx.font = "500 20px Inter, sans-serif"; ctx.fillText("Saccade · Glance Test · dashed = AI prediction, glow = real eyes", 40, H - 24);
+  ctx.fillStyle = "#C2ACA2"; ctx.font = "500 20px Inter, sans-serif"; ctx.fillText("Saccade · Glance Test · dashed = AI prediction · white-hot = most looked at", 40, H - 24);
   const a = document.createElement("a"); a.download = "saccade-crowd-heatmap.png"; a.href = c.toDataURL("image/png"); a.click();
 };
 drawCrowd();
