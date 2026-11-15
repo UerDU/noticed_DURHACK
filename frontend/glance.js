@@ -6,7 +6,9 @@
    ========================================================= */
 
 const LOOK_MS = 3000;          // how long people look at the poster
-const MIN_DWELL_MS = 120;      // must look this long at an element to count as "seen"
+const MIN_DWELL_MS = 100;      // eyes must rest this long in one spot to count as a fixation
+const FIX_SPREAD = 9;          // a fixation stays within ~9% of the poster (webcams are noisy)
+const NEAR_PCT = 7;            // a fixation just outside a box still counts if it's this close
 const WEBGAZER_ASSETS = "https://cdn.jsdelivr.net/npm/webgazer@3.5.3/dist/mediapipe/face_mesh";
 
 const $ = (id) => document.getElementById(id);
@@ -118,18 +120,37 @@ function analyse(rect) {
     .map(s => ({ x: (s.x - rect.left) / rect.width * 100, y: (s.y - rect.top) / rect.height * 100, t: s.t }))
     .filter(p => p.x >= -5 && p.x <= 105 && p.y >= -5 && p.y <= 105);
 
-  const inBox = (p, b) => p.x >= b[0] - 3 && p.x <= b[0] + b[2] + 3 && p.y >= b[1] - 3 && p.y <= b[1] + b[3] + 3;
-  // which element was each point on? (smallest box wins, so the small offer beats the big photo)
-  const byArea = [...r.elements].sort((a, b) => a.box[2] * a.box[3] - b.box[2] * b.box[3]);
-  const hit = (p) => (byArea.find(e => inBox(p, e.box)) || {}).label || null;
-
-  // human order: first time each element is looked at for at least MIN_DWELL_MS
-  const youOrder = []; let cur = null, since = 0;
-  pts.forEach(p => {
-    const h = hit(p);
-    if (h !== cur) { cur = h; since = p.t; }
-    if (h && !youOrder.includes(h) && p.t - since >= MIN_DWELL_MS) youOrder.push(h);
+  // 1) smooth the webcam jitter: running median of 5 samples
+  const med = (a) => a.slice().sort((m, n) => m - n)[a.length >> 1];
+  const smooth = pts.map((p, i) => {
+    const win = pts.slice(Math.max(0, i - 2), i + 3);
+    return { x: med(win.map(q => q.x)), y: med(win.map(q => q.y)), t: p.t };
   });
+
+  // 2) group into fixations: eyes resting in one small area for >= MIN_DWELL_MS (I-DT, like eye-tracking labs)
+  const fixations = []; let start = 0;
+  const spread = (a) => (Math.max(...a.map(q => q.x)) - Math.min(...a.map(q => q.x))) + (Math.max(...a.map(q => q.y)) - Math.min(...a.map(q => q.y)));
+  for (let i = 1; i <= smooth.length; i++) {
+    const win = smooth.slice(start, i + 1);
+    if (i === smooth.length || spread(win) > FIX_SPREAD) {
+      const fx = smooth.slice(start, i);
+      if (fx.length && fx[fx.length - 1].t - fx[0].t >= MIN_DWELL_MS)
+        fixations.push({ x: fx.reduce((s, q) => s + q.x, 0) / fx.length, y: fx.reduce((s, q) => s + q.y, 0) / fx.length });
+      start = i;
+    }
+  }
+
+  // 3) which element is each fixation on? inside a box (smallest wins), else the nearest box if it's close
+  const byArea = [...r.elements].sort((a, b) => a.box[2] * a.box[3] - b.box[2] * b.box[3]);
+  const dist = (p, b) => Math.hypot(Math.max(b[0] - p.x, 0, p.x - b[0] - b[2]), Math.max(b[1] - p.y, 0, p.y - b[1] - b[3]));
+  const hit = (p) => {
+    const inside = byArea.find(e => dist(p, e.box) === 0);
+    if (inside) return inside.label;
+    const near = [...r.elements].sort((a, b) => dist(p, a.box) - dist(p, b.box))[0];
+    return near && dist(p, near.box) <= NEAR_PCT ? near.label : null;
+  };
+  const youOrder = [];
+  fixations.forEach(f => { const h = hit(f); if (h && !youOrder.includes(h)) youOrder.push(h); });
   const aiOrder = r.eye_path.map(p => p.label).filter((l, i, a) => l && a.indexOf(l) === i);
 
   const pct = matchPct(aiOrder, youOrder);
@@ -248,11 +269,18 @@ $("againBtn").onclick = () => {
 window.addEventListener("beforeunload", () => { try { window.webgazer && webgazer.end(); } catch (e) {} });
 
 
-// match score: same position = full point, off by one = half point
+// match score = Kendall's tau on the order: 100% = same order as the AI, 0% = no better than a random guess.
+// Parts you never looked at count as "after everything you did look at".
 function matchPct(aiOrder, youOrder) {
-  let score = 0;
-  aiOrder.forEach((l, i) => { const j = youOrder.indexOf(l); if (j === i) score += 1; else if (j !== -1 && Math.abs(j - i) === 1) score += 0.5; });
-  return aiOrder.length ? Math.round(score / aiOrder.length * 100) : 0;
+  if (!youOrder.length || aiOrder.length < 2) return 0;
+  const rank = (l) => { const i = youOrder.indexOf(l); return i === -1 ? Infinity : i; };
+  let agree = 0, disagree = 0;
+  for (let i = 0; i < aiOrder.length; i++) for (let j = i + 1; j < aiOrder.length; j++) {
+    const a = rank(aiOrder[i]), b = rank(aiOrder[j]);
+    if (a === b) continue;                     // both unseen: no information
+    a < b ? agree++ : disagree++;
+  }
+  return agree + disagree ? Math.max(0, Math.round((agree - disagree) / (agree + disagree) * 100)) : 0;
 }
 
 /* ---------- crowd view: everyone's eyes on this poster ---------- */

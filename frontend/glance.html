@@ -120,7 +120,7 @@
                 <span class="mono" style="font-size: 12px; color: var(--label)">AI ▢</span><div class="seq-row" id="aiSeq"></div>
                 <span class="mono" style="font-size: 12px; color: var(--accent)">YOU ●</span><div class="seq-row" id="youSeq"></div>
               </div>
-              <p class="note" style="margin: 12px 0 0">Dashed squares = where the AI predicted eyes would go. Pink circles = where your eyes actually went, in order. Green outline = you agreed.</p>
+              <p class="note" style="margin: 12px 0 0">Dashed squares = where the AI predicted eyes would go. Pink circles = where your eyes actually went, in order. Green outline = you agreed. The match % compares the whole order (Kendall’s tau): 100% = same order, 0% = no better than a random guess.</p>
             </div>
             <div class="glass" style="padding: 20px; border-radius: 22px" id="msgBox"></div>
             <div style="display: flex; gap: 12px; flex-wrap: wrap">
@@ -202,6 +202,6 @@
 <div id="look"><div class="count" id="countTxt">Look at the poster</div><img id="lookImg" alt="Poster to look at"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/webgazer@3.5.3/dist/webgazer.js"></script>
-<script src="glance.js?v=4"></script>
+<script src="glance.js?v=5"></script>
 </body>
 </html>
