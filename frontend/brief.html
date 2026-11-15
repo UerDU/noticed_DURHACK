@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Not sure what to say? · Saccade</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@500;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@500;700&family=Poppins:wght@600;800&family=Montserrat:wght@500;800&family=Fraunces:opsz,wght@9..144,600;9..144,800&display=swap">
 <style>
   /* Cherry Velvet, same as the rest of Saccade */
   :root {
@@ -112,6 +112,15 @@
   .linkish { font: inherit; font-size: 16px; background: none; border: 0; color: var(--accent); cursor: pointer; padding: 6px 0; text-decoration: underline; text-underline-offset: 3px; }
   .welcome ul { list-style: none; padding: 0; margin: 0 0 6px; display: grid; gap: 10px; font-size: 17px; }
   .welcome li::before { content: "✓"; color: var(--accent); font-weight: 800; margin-right: 10px; }
+  .drafts { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 16px; }
+  .draft { display: flex; flex-direction: column; gap: 8px; }
+  .draft canvas { width: 100%; height: auto; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.45); background: #222; }
+  .draft b { font-size: 15px; }
+  .draft .why { font-size: 13.5px; color: var(--muted); line-height: 1.4; }
+  .draft .btns { display: flex; gap: 6px; flex-wrap: wrap; }
+  .draft .btns a, .draft .btns button { font: inherit; font-size: 13px; font-weight: 700; padding: 8px 12px; border-radius: 999px; text-decoration: none; cursor: pointer; }
+  .draft .btns a { background: var(--accent); color: var(--bg); border: 0; }
+  .draft .btns button { background: rgba(255,255,255,0.06); color: var(--ink); border: 1px solid var(--line); }
 </style>
 </head>
 <body>
@@ -140,9 +149,10 @@ const cap = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
 // Guess what kind of message the owner wants to promote.
 function classify(t) {
   const s = t.toLowerCase();
-  if (/(\d+\s?%|\boff\b|\bsale\b|discount|\bdeal\b|£|bogof|2[- ]?for[- ]?1|voucher|half price)/.test(s)) return 'offer';
+  if (/(\d+\s?%|\boff\b|\bsale\b|discount|\bdeal\b|£|bogof|2[- ]?for[- ]?1|voucher|half price|\bfree\b)/.test(s)) return 'offer';
+  if (/(\bcall\b|\bbook\b|booking|appointment|repair|\bfix|plumb|electric|clean|haircut|barber|salon|\bmot\b|garage|lesson|tutor|therapy|massage|delivery service|hiring|we are hiring)/.test(s)) return 'service';
   if (/(night|event|party|workshop|market|launch|opening|open mic|class|festival|gig|concert|tournament|meetup|social|show|live music)/.test(s)) return 'event';
-  if (/(menu|\bnew\b|flavou?r|collection|range|dish|product|batch|season|special|arrival|drink|bake|coffee|cake)/.test(s)) return 'product';
+  if (/(menu|\bnew\b|flavou?r|collection|range|dish|product|batch|season|special|arrival|drink|bake|coffee|cake|hand-?made|candle|jewel|print|clothing|soap|plant)/.test(s)) return 'product';
   return 'story';
 }
 
@@ -217,6 +227,11 @@ function ideasFor(A) {
     { title: 'Made today', what: `A short clip or photo of it being made or prepared${A.special ? `, with "${A.special}" as the caption` : ''}.`, notice: 'The process' },
     { title: 'First reactions', what: 'Ask a customer what they think and post a photo with their one-line quote.', notice: 'The quote' }
   ];
+  else if (type === 'service') list = [
+    { title: 'Problem, then fix', what: `Start with the problem your customers have, in big text, then one line saying you fix it${A.book ? `, and "${A.book}" underneath` : ''}.`, notice: 'The problem you solve' },
+    { title: 'Before and after', what: 'Two photos side by side: before and after your work. One short caption, no paragraphs.', notice: 'The difference' },
+    { title: 'Book in one step', what: `Make how to book the biggest thing${A.book ? ` ("${A.book}")` : ''}, with your name and one line about what you do.`, notice: 'How to book' }
+  ];
   else list = [
     { title: 'Meet the maker', what: 'A friendly portrait of you or your team with one sentence about why you do this.', notice: 'Your face' },
     { title: 'Why we started', what: 'A photo of where it all began with a short caption in your own words.', notice: 'The first line of your story' },
@@ -264,6 +279,7 @@ function buildBrief(A) {
   if (A.offerType === 'offer' && when) core += ' · ' + when.toLowerCase();
   if (A.offerType === 'event' && A.when) core += ' · ' + A.when;
   if (A.offerType === 'product' && A.special) core += ' · ' + A.special;
+  if (A.offerType === 'service' && A.book) core += ' · ' + A.book;
   return {
     core,
     notice: (A.offer || '').slice(0, 80),
@@ -308,8 +324,12 @@ function detailQs(type) {
   if (type === 'offer') return [{ id: 'when', kind: 'choice', text: 'When does it end?', options: ['This weekend', 'This week', 'This month', 'No end date'] }];
   if (type === 'event') return [{ id: 'when', kind: 'text', text: 'What day, time and place? One line is fine.', placeholder: 'e.g. Friday 8pm, 12 Elvet Bridge' }];
   if (type === 'product') return [{ id: 'special', kind: 'text', text: 'What makes it special, in your own words?', placeholder: 'e.g. baked fresh every morning' }];
+  if (type === 'service') return [{ id: 'book', kind: 'text', text: 'How do people book you? Phone, website or just walk in?', placeholder: 'e.g. call 0191 123 4567' }];
   return [];
 }
+
+// "What kind of message is this?" with our guess already ticked, so one tap confirms it
+const KINDS = { 'A deal or discount': 'offer', 'An event': 'event', 'Something new to buy': 'product', 'A service people can book': 'service', 'Our story, getting known': 'story' };
 
 // Decides what to ask next about the main message.
 async function resolveOffer(v, noMore) {
@@ -333,11 +353,20 @@ async function resolveOffer(v, noMore) {
     });
     return;
   }
-  A.offerType = classify(A.offer);           // offer / event / product / story -> different follow-up
-  insertNext(...detailQs(A.offerType));
+  const guess = classify(A.offer);           // offer / event / product / service / story
+  insertNext({
+    id: 'kind', kind: 'choice', text: 'What kind of message is this?', suggest: Object.keys(KINDS).find(k => KINDS[k] === guess),
+    options: Object.keys(KINDS),
+    after: v => { A.offerType = KINDS[v]; insertNext(...detailQs(A.offerType)); }
+  });
 }
 
 const Q = {
+  name: {
+    id: 'name', kind: 'text',
+    text: "First, what's your business called?",
+    placeholder: 'e.g. Bloom Café'
+  },
   goal: {
     id: 'goal', kind: 'choice',
     text: 'What would help your business most in the next month?',
@@ -393,7 +422,7 @@ const Q = {
     }
   }
 };
-const BASE = [Q.goal, Q.offer, Q.audience, Q.why, Q.vibe, Q.assets, Q.budget, Q.channels];
+const BASE = [Q.name, Q.goal, Q.offer, Q.audience, Q.why, Q.vibe, Q.assets, Q.budget, Q.channels];
 
 /* =====================================================================
    3. ONE QUESTION PER SCREEN
@@ -444,7 +473,7 @@ function show(q, prev) {
   const card = el('section', 'card');
   if (note) card.appendChild(el('div', 'note', note));
   card.appendChild(el('h2', '', typeof q.text === 'function' ? q.text() : q.text));
-  const sub = q.kind === 'multi' ? (q.max ? `Tap up to ${q.max}, then press Next.` : 'Tap all that fit, then press Next.')
+  const sub = q.suggest ? 'We ticked our best guess. Tap it to confirm, or pick another.' : q.kind === 'multi' ? (q.max ? `Tap up to ${q.max}, then press Next.` : 'Tap all that fit, then press Next.')
             : q.kind === 'choice' ? 'Tap one.' : 'A few words is plenty.';
   card.appendChild(el('p', 'sub', sub));
 
@@ -453,7 +482,7 @@ function show(q, prev) {
     q.options.forEach(o => {
       const t = el('button', 'tile'); t.type = 'button';
       t.append(el('span', 'box'), el('span', '', o));
-      if (prev === o) t.classList.add('on');
+      if (prev === o || (prev === undefined && q.suggest === o)) { t.classList.add('on'); t.querySelector('.box').textContent = '✓'; }
       t.onclick = () => { tiles.querySelectorAll('.tile').forEach(x => x.classList.remove('on')); t.classList.add('on'); t.querySelector('.box').textContent = '✓'; setTimeout(() => answer(q, o), 260); };
       tiles.appendChild(t);
     });
@@ -511,6 +540,110 @@ function textBlock(q, placeholder, value) {
   return f;
 }
 
+
+/* =====================================================================
+   5. POSTER DRAFTS: draw 3 real layouts from the brief, using composition
+   rules, so the owner gets a design proposal, not just advice.
+   ===================================================================== */
+const POSTER_FONTS = { Playful: 'Poppins', Bold: 'Poppins', Friendly: 'Poppins', Sleek: 'Montserrat', Modern: 'Montserrat', Premium: 'Montserrat', Cosy: 'Fraunces', Handmade: 'Fraunces', Serious: 'Fraunces', Calm: 'Montserrat' };
+const lum = hex => { const n = parseInt(hex.slice(1), 16); const c = [n >> 16, (n >> 8) & 255, n & 255].map(v => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
+const sat = hex => { const n = parseInt(hex.slice(1), 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255, mx = Math.max(r, g, b), mn = Math.min(r, g, b); return mx ? (mx - mn) / mx : 0; };
+const ratio = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+
+function posterColours(cols) {
+  const accent = [...cols].sort((a, b) => sat(b) - sat(a))[0] || '#AD2831';
+  const rest = cols.filter(c => c !== accent);
+  const lightest = [...cols].sort((a, b) => lum(b) - lum(a))[0];
+  const darkest = [...rest].sort((a, b) => lum(a) - lum(b))[0];
+  const light = lightest && lum(lightest) > 0.55 ? lightest : '#FFFBF4';    // the brief's own cream if it has one
+  const dark = darkest && lum(darkest) < 0.06 ? darkest : '#1A1214';
+  const on = bg => ratio(bg, dark) >= ratio(bg, light) ? dark : light;   // the most readable text colour
+  return { light, dark, accent, on };
+}
+// fit text into a box: biggest size that fits in up to maxLines lines
+function fitText(ctx, text, font, weight, maxW, maxH, maxLines, maxSize) {
+  for (let size = maxSize; size >= 18; size -= 4) {
+    ctx.font = `${weight} ${size}px "${font}"`;
+    const wordsArr = text.split(/\s+/), lines = []; let line = '';
+    for (const w of wordsArr) { const t = line ? line + ' ' + w : w; if (ctx.measureText(t).width <= maxW) line = t; else { if (line) lines.push(line); line = w; } }
+    if (line) lines.push(line);
+    const lh = size * 1.08;
+    if (lines.length <= maxLines && lines.every(l => ctx.measureText(l).width <= maxW) && lines.length * lh <= maxH) return { size, lines, lh };
+  }
+  ctx.font = `${weight} 18px "${font}"`; return { size: 18, lines: [text], lh: 20 };
+}
+function drawLines(ctx, fit, x, y, align) { ctx.textAlign = align; ctx.textBaseline = 'top'; fit.lines.forEach((l, i) => ctx.fillText(l, x, y + i * fit.lh)); return y + fit.lines.length * fit.lh; }
+function photoSpot(ctx, x, y, w, h, col) {
+  ctx.save(); ctx.strokeStyle = col; ctx.globalAlpha = 0.55; ctx.lineWidth = 4; ctx.setLineDash([18, 12]);
+  ctx.beginPath(); ctx.roundRect(x, y, w, h, 28); ctx.stroke(); ctx.setLineDash([]);
+  ctx.font = '600 44px Inter'; ctx.fillStyle = col; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('Your photo here', x + w / 2, y + h / 2); ctx.restore();
+}
+
+async function makeDrafts(A, b) {
+  const font = POSTER_FONTS[(A.vibe || [])[0]] || 'Poppins';
+  try { await Promise.all([document.fonts.load(`800 60px "${font}"`), document.fonts.load('600 30px Inter')]); } catch (e) {}
+  const C = posterColours(b.colours.length ? b.colours : ['#FD9BB7', '#640D14', '#F3E6BD']);
+  const msg = cap(A.offer || 'Your main message');
+  const extra = A.offerType === 'offer' && A.when && A.when !== 'No end date' ? A.when : A.offerType === 'event' ? (A.when || '') : A.offerType === 'product' ? (A.special || '') : A.offerType === 'service' ? (A.book || '') : '';
+  const name = (A.name || 'Your business').toUpperCase();
+  const W = 1080, H = 1350, out = [];
+
+  // 1) Message first: the offer fills the top third, so it's the first thing seen
+  {
+    const c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d');
+    x.fillStyle = C.light; x.fillRect(0, 0, W, H);
+    x.fillStyle = C.accent; x.fillRect(0, 0, W, 560);
+    x.fillStyle = C.on(C.accent); const f = fitText(x, msg, font, 800, W - 160, 360, 3, 150);
+    const y0 = 80 + (360 - f.lines.length * f.lh) / 2, end = drawLines(x, f, 80, y0, 'left');
+    if (extra) { x.font = `600 60px "${font}"`; x.fillText(extra, 80, Math.min(end + 24, 470)); }
+    photoSpot(x, 80, 620, W - 160, 520, C.on(C.light));
+    x.fillStyle = C.on(C.light); x.font = '800 48px Inter'; x.textAlign = 'left'; x.textBaseline = 'alphabetic'; x.fillText(name, 80, H - 80);
+    out.push({ c, title: 'Message first', why: 'Your message takes the top third in a bold colour block. People read top-down, so it is seen first.', target: { x: 50, y: 21 } });
+  }
+  // 2) Centre stage: one big circle in the middle = one clear focal point
+  {
+    const c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d');
+    x.fillStyle = C.dark; x.fillRect(0, 0, W, H);
+    x.fillStyle = C.accent; x.beginPath(); x.arc(W / 2, H * 0.47, 430, 0, Math.PI * 2); x.fill();
+    x.fillStyle = C.on(C.accent); const f = fitText(x, msg, font, 800, 640, 420, 4, 130);
+    const end = drawLines(x, f, W / 2, H * 0.47 - f.lines.length * f.lh / 2 - (extra ? 30 : 0), 'center');
+    if (extra) { x.font = `600 56px "${font}"`; x.fillText(extra, W / 2, end + 18); }
+    x.fillStyle = C.on(C.dark); x.font = '800 48px Inter'; x.textAlign = 'center'; x.textBaseline = 'alphabetic'; x.fillText(name, W / 2, H - 90);
+    out.push({ c, title: 'Centre stage', why: 'Eyes land near the middle first. One big circle there makes your message the only focal point.', target: { x: 50, y: 47 } });
+  }
+  // 3) Rule of thirds: message on the left third line, photo on the right, name bottom
+  {
+    const c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d');
+    x.fillStyle = C.light; x.fillRect(0, 0, W, H);
+    photoSpot(x, 600, 80, 400, H - 260, C.on(C.light));
+    x.fillStyle = C.accent; x.fillRect(80, 380, 16, 420);
+    x.fillStyle = C.on(C.light); const f = fitText(x, msg, font, 800, 460, 420, 5, 110);
+    const end = drawLines(x, f, 130, 380, 'left');
+    if (extra) { x.fillStyle = C.accent; x.font = `700 54px "${font}"`; x.fillText(extra, 130, end + 22); }
+    x.fillStyle = C.on(C.light); x.font = '800 48px Inter'; x.textAlign = 'left'; x.textBaseline = 'alphabetic'; x.fillText(name, 80, H - 80);
+    out.push({ c, title: 'Rule of thirds', why: 'The message sits on the left third line, where designers put key points. The photo balances the right.', target: { x: 25, y: 38 } });
+  }
+  return out;
+}
+
+function draftsSection(A, b) {
+  const wrap = el('div', 'drafts');
+  makeDrafts(A, b).then(list => list.forEach(d => {
+    const box = el('div', 'draft');
+    box.append(d.c, el('b', '', d.title), el('div', 'why', d.why));
+    const btns = el('div', 'btns');
+    const check = el('a', '', 'Check with Saccade →'); check.href = './?draft#try';
+    check.onclick = () => {
+      try { sessionStorage.setItem('saccade:draft', JSON.stringify({ img: d.c.toDataURL('image/jpeg', 0.9), goal: (A.offer || '').slice(0, 60), x: d.target.x, y: d.target.y })); } catch (e) {}
+    };
+    const dl = el('button', '', 'Download'); dl.type = 'button';
+    dl.onclick = () => { const a = document.createElement('a'); a.download = 'poster-' + d.title.toLowerCase().replace(/\s+/g, '-') + '.png'; a.href = d.c.toDataURL('image/png'); a.click(); };
+    btns.append(check, dl); box.appendChild(btns); wrap.appendChild(box);
+  }));
+  return wrap;
+}
+
 /* =====================================================================
    4. SHOWING THE BRIEF
    ===================================================================== */
@@ -527,6 +660,8 @@ function renderBrief(b) {
 
   const core = el('div', 'core'); core.appendChild(el('mark', '', b.core));
   section(card, 'What people should notice first', core);
+  section(card, 'Your poster drafts', draftsSection(A, b));
+  card.lastChild.before(el('div', 'notice', 'Three layouts made from your answers. Add your own photo, or check one straight away to see where eyes will go.'));
   section(card, 'Who it is for', el('div', '', b.audience + (b.different ? '. What makes you different: ' + b.different.toLowerCase() + '.' : '')));
   section(card, 'How it should sound', el('div', '', 'Tone: ' + b.tone + '. ' + b.voice));
 
@@ -575,9 +710,9 @@ function start() {
   A = {}; queue = [...BASE]; history = []; note = '';
   topbar.hidden = true; setBar(0);
   const card = el('section', 'card welcome');
-  card.append(el('h2', '', "Let's work out what to put on your poster."));
+  card.append(el('h2', '', "Let's work out your message, then we'll draw your poster."));
   const ul = el('ul');
-  ['About 8 questions, mostly one tap each', 'No design skills needed', 'Nothing to pay, nothing to sign up for', 'You can go back and change an answer any time']
+  ['About 10 questions, mostly one tap each', 'No design skills needed', 'Nothing to pay, nothing to sign up for', 'You can go back and change an answer any time']
     .forEach(t => ul.appendChild(el('li', '', t)));
   const r = el('div', 'nextrow'); const b = el('button', 'nextbtn', "Let's start →"); b.type = 'button'; b.onclick = go; r.appendChild(b);
   card.append(ul, r);

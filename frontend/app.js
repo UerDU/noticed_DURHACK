@@ -109,6 +109,19 @@ document.querySelectorAll(".chip").forEach(chip => chip.onclick = () => {
   updateButton();
 });
 $("goal").oninput = updateButton;
+// coming from a poster draft on the "No poster yet?" page: load it, fill the message, mark where it is
+if (params.has("draft")) {
+  try {
+    const d = JSON.parse(sessionStorage.getItem("saccade:draft") || "null");
+    if (d) fetch(d.img).then(r => r.blob()).then(blob => {
+      setFile(new File([blob], "My poster draft.jpg", { type: "image/jpeg" }));
+      $("goal").value = d.goal;
+      targetPt = { x: d.x, y: d.y };
+      const s = $("tapStar"); s.hidden = false; s.style.left = d.x + "%"; s.style.top = d.y + "%";
+      updateButton();
+    });
+  } catch (e) {}
+}
 // coming back from the "Not sure what to say?" page: fill in the message for them
 if (params.get("notice")) { $("goal").value = params.get("notice"); }
 function updateButton() { $("checkBtn").disabled = !(imageFile && $("goal").value.trim()); }

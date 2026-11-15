@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Saccade · Make your poster impossible to miss</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@500;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@500;700&family=Fraunces:ital,opsz,wght@0,9..144,800;1,9..144,600&display=swap">
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="opening.css">
 </head>
@@ -67,14 +67,55 @@
           <h1 style="margin: 0; font-size: 46px; line-height: 1.05; letter-spacing: -1.4px">Make yours the one <span style="font-family: 'Instrument Serif', serif; font-style: italic; font-weight: 400; color: #FD9BB7">they notice.</span></h1>
           <p style="margin: 0; font-size: 18px; line-height: 1.55; color: #E6D6C8">Your poster is never alone on the wall. We show you what people look at first, and how to put your message there.</p>
           <div style="display: flex; gap: 14px; flex-wrap: wrap"><a href="#try" style="padding: 16px 26px; border-radius: 999px; background: #FD9BB7; color: #120709; font-weight: 700">Analyse my poster</a><button type="button" class="btn-ghost js-example" style="font-size: 16px; padding: 16px 22px">See an example</button></div>
-          <a href="brief.html" class="glass-soft" style="display: flex; align-items: center; gap: 14px; padding: 14px 18px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.22); color: var(--text); text-decoration: none; max-width: 460px">
+          <a href="#make" class="glass-soft" style="display: flex; align-items: center; gap: 14px; padding: 14px 18px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.22); color: var(--text); text-decoration: none; max-width: 460px">
             <span style="flex: 0 0 auto; width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; background: rgba(253,155,183,0.18); color: #FD9BB7; font-size: 18px">?</span>
-            <span><b style="display: block">No poster yet? Not sure what to say?</b><span style="font-size: 14px; color: #E6D6C8">Answer a few quick questions and get your message, colours and 3 post ideas. <span style="color: #FD9BB7">Start here →</span></span></span>
+            <span><b style="display: block">No poster yet? Not sure what to say?</b><span style="font-size: 14px; color: #E6D6C8">Answer a few taps and we draw 3 poster drafts for you. <span style="color: #FD9BB7">See how ↓</span></span></span>
           </a>
         </div>
       </div>
     </div>
   </header>
+
+
+  <!-- ================= 1b · NO POSTER YET? ================= -->
+  <section id="make" class="section make">
+    <div class="make-grid">
+      <div class="make-text">
+        <div class="eyebrow reveal">No poster yet?</div>
+        <h2 class="big reveal">Answer a few taps. <span class="serif">We'll draw it with you.</span></h2>
+        <p class="muted reveal" style="font-size: 18px; margin: 0">Not sure what to say, or how it should look? Tell us about your business and we turn it into a message, colours and three ready-made poster drafts.</p>
+        <ol class="make-steps">
+          <li class="reveal"><span>1</span><div><b>Tell us your message</b>About ten quick questions, mostly one tap each. No design skills needed.</div></li>
+          <li class="reveal"><span>2</span><div><b>Get 3 poster drafts</b>Each one uses a composition rule: message first, centre stage, rule of thirds.</div></li>
+          <li class="reveal"><span>3</span><div><b>Check where eyes go</b>One tap sends a draft into Saccade to see what people notice first.</div></li>
+        </ol>
+        <div class="reveal" style="display: flex; gap: 14px; flex-wrap: wrap; align-items: center">
+          <a href="brief.html" class="btn" style="padding: 16px 28px; font-size: 17px">Start here →</a>
+          <a href="#try" class="muted" style="font-size: 15px">I already have a poster ↓</a>
+        </div>
+      </div>
+      <div class="make-fan" aria-hidden="true">
+        <div class="mini m1 reveal">
+          <div class="m1-top"><div class="m-big">50% OFF</div><div class="m-sub">all pastries · this weekend</div></div>
+          <div class="m-art"><i class="plate"></i><i class="pa1"></i><i class="pa2"></i><i class="mug"></i><i class="steam"></i></div>
+          <div class="m-foot"><span class="m-logo">Bloom Café</span><span>12 Elvet Bridge</span></div>
+          <div class="m-label">Message first</div>
+        </div>
+        <div class="mini m2 reveal">
+          <div class="m-logo m2-logo">Bloom Café</div>
+          <div class="m2-circle"><div class="m-big">50%<br>OFF</div><div class="m-sub">all pastries</div></div>
+          <div class="m-foot"><span>Sat &amp; Sun only</span><span>12 Elvet Bridge</span></div>
+          <div class="m-label">Centre stage</div>
+        </div>
+        <div class="mini m3 reveal">
+          <div class="m3-text"><div class="m-logo">Bloom Café</div><div class="m-big">50%<br>OFF</div><div class="m-sub">all pastries,<br>this weekend</div></div>
+          <div class="m3-art"><div class="m-art"><i class="plate"></i><i class="pa1"></i><i class="pa2"></i><i class="mug"></i><i class="steam"></i></div></div>
+          <div class="m-foot"><span></span><span>12 Elvet Bridge</span></div>
+          <div class="m-label">Rule of thirds</div>
+        </div>
+      </div>
+    </div>
+  </section>
 
   <!-- ================= 2 · ADD YOUR POSTER ================= -->
   <section id="try" class="section">
